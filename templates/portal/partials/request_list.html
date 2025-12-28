@@ -1,0 +1,113 @@
+<div id="request-list-container">
+    {% if not request_list %}
+            <div class="text-center py-4 text-muted">
+            表示できる申請はありません。
+        </div>
+    {% else %}
+        <!-- 申請一覧ページネーション（上部） -->
+        {% if request_list.has_other_pages %}
+        <nav aria-label="Request Page navigation top" class="mb-3">
+            <ul class="pagination justify-content-start">
+                {% if request_list.has_previous %}
+                    <li class="page-item">
+                        <button class="page-link ajax-pagination" data-target="request" data-page="{{ request_list.previous_page_number }}">
+                            前へ
+                        </button>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">前へ</span></li>
+                {% endif %}
+
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link">{{ request_list.number }} / {{ request_list.paginator.num_pages }}</span>
+                </li>
+
+                {% if request_list.has_next %}
+                    <li class="page-item">
+                        <button class="page-link ajax-pagination" data-target="request" data-page="{{ request_list.next_page_number }}">
+                            次へ
+                        </button>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">次へ</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 15%;">申請番号</th>
+                        <th style="width: 40%;">件名</th>
+                        <th style="width: 20%;">申請者</th>
+                        <th style="width: 15%;">申請日時</th>
+                        <th style="width: 10%;">ステータス</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in request_list %}
+                        <tr onclick="window.location='{% url 'approvals:detail' req.id %}'" style="cursor: pointer;">
+                            <td>{{ req.request_number }}</td>
+                            <td>
+                                {{ req.title }}
+                                {% if req.is_restricted %}
+                                    <i class="bi bi-lock-fill text-secondary ms-1" title="閲覧制限あり"></i>
+                                {% endif %}
+                            </td>
+                            <td>{{ req.applicant.get_display_name }}</td>
+                            <td>{{ req.submitted_at|date:"Y/m/d H:i" }}</td>
+                            <td>
+                                {% if req.status == 0 %}
+                                    <span class="badge bg-secondary">下書き</span>
+                                {% elif req.status == 1 %}
+                                    <span class="badge bg-primary">申請中</span>
+                                {% elif req.status == 2 %}
+                                    <span class="badge bg-success">承認済</span>
+                                {% elif req.status == 3 %}
+                                    <span class="badge bg-warning text-dark">差戻</span>
+                                {% elif req.status == 4 %}
+                                    <span class="badge bg-secondary">取下</span>
+                                {% elif req.status == 9 %}
+                                    <span class="badge bg-danger">却下</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 申請一覧ページネーション（下部） -->
+        {% if request_list.has_other_pages %}
+        <nav aria-label="Request Page navigation bottom" class="mt-4">
+            <ul class="pagination justify-content-start">
+                {% if request_list.has_previous %}
+                    <li class="page-item">
+                        <button class="page-link ajax-pagination" data-target="request" data-page="{{ request_list.previous_page_number }}">
+                            前へ
+                        </button>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">前へ</span></li>
+                {% endif %}
+
+                <li class="page-item active" aria-current="page">
+                    <span class="page-link">{{ request_list.number }} / {{ request_list.paginator.num_pages }}</span>
+                </li>
+
+                {% if request_list.has_next %}
+                    <li class="page-item">
+                        <button class="page-link ajax-pagination" data-target="request" data-page="{{ request_list.next_page_number }}">
+                            次へ
+                        </button>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">次へ</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    {% endif %}
+</div>

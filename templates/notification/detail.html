@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}{{ notification.title }} - お知らせ{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item active" aria-current="page">お知らせ詳細</li>
+            </ol>
+        </nav>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-light py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="h4 mb-0">{{ notification.title }}</h2>
+                </div>
+            </div>
+            <div class="card-body p-4">
+                <div class="text-muted mb-4 border-bottom pb-2">
+                    <small>公開日: {{ notification.published_at|date:"Y年m月d日 H:i" }}</small>
+                </div>
+                
+                <div class="card-text">
+                    {{ notification.content|linebreaks }}
+                </div>
+            </div>
+            <div class="card-footer bg-white text-end">
+                <a href="{% url 'portal:index' %}" class="btn btn-outline-secondary">戻る</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

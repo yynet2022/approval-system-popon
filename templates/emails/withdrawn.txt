@@ -1,0 +1,8 @@
+申請が取り下げられました。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+申請者: {{ request_obj.applicant.get_display_name }}
+
+この申請は申請者本人により取り下げられました。
+{{ link }}

@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}再申請{% else %}新規申請{% endif %} - 承認システム{% endblock %}
+
+{% block extra_css %}
+<!-- DAL用のCSS -->
+{{ approver_formset.media.css }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h2 class="mb-4">{% if form.instance.pk %}再申請{% else %}新規申請{% endif %}</h2>
+
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    <!-- 申請基本情報 -->
+                    <h4 class="mb-3 border-bottom pb-2">基本情報</h4>
+                    <div class="mb-3">
+                        <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
+                        {{ form.title }}
+                        {{ form.title.errors }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.content.id_for_label }}" class="form-label">{{ form.content.label }}</label>
+                        {{ form.content }}
+                        {{ form.content.errors }}
+                    </div>
+
+                    <div class="mb-4 form-check">
+                        {{ form.is_restricted }}
+                        <label class="form-check-label" for="{{ form.is_restricted.id_for_label }}">
+                            {{ form.is_restricted.label }}
+                            <small class="text-muted d-block">
+                                チェックすると、申請者と承認ルートのユーザー以外はこの申請を閲覧できなくなります。
+                            </small>
+                        </label>
+                    </div>
+
+                    <!-- 承認ルート設定 -->
+                    <h4 class="mb-3 border-bottom pb-2">承認ルート設定</h4>
+                    <p class="text-muted small mb-3">
+                        承認者を順番に設定してください。上から順に承認が回ります。<br>
+                        ※自分自身や、直前と同じ承認者は設定できません。
+                    </p>
+
+                    {{ approver_formset.management_form }}
+                    
+                    <!-- 空のフォームテンプレート（JSで使用） -->
+                    <!-- scriptタグにすることで、ブラウザによるtdタグの自動削除(パース)を防ぐ -->
+                    <script type="text/html" id="empty-form-template">
+                        <td class="text-center align-middle order-number">
+                            <!-- JSで番号設定 -->
+                        </td>
+                        <td>
+                            {{ approver_formset.empty_form.id }}
+                            {{ approver_formset.empty_form.order }}
+                            {{ approver_formset.empty_form.user }}
+                            {{ approver_formset.empty_form.user.errors }}
+                        </td>
+                    </script>
+
+                    <div class="table-responsive mb-2">
+                        <table class="table table-bordered" id="approver-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 10%; text-align: center;">順序</th>
+                                    <th>承認者</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for form in approver_formset %}
+                                    <tr class="approver-row">
+                                        <td class="text-center align-middle order-number">
+                                            {{ forloop.counter }}
+                                        </td>
+                                        <td>
+                                            {{ form.id }}
+                                            {{ form.order }}
+                                            {{ form.user }}
+                                            {{ form.user.errors }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mb-4 text-end">
+                        <button type="button" class="btn btn-outline-success btn-sm" id="add-approver">
+                            <i class="bi bi-plus-circle me-1"></i>承認者を追加
+                        </button>
+                    </div>
+
+                    {% if approver_formset.non_form_errors %}
+                        <div class="alert alert-danger">
+                            {{ approver_formset.non_form_errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'portal:index' %}" class="btn btn-secondary me-md-2">キャンセル</a>
+                        <button type="submit" class="btn btn-primary btn-lg px-5">{% if form.instance.pk %}再申請する{% else %}申請する{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery (DALに必要) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- DAL用のJS -->
+{{ approver_formset.media.js }}
+<!-- 承認者動的追加用JS -->
+<script src="{% static 'js/request_form.js' %}"></script>
+{% endblock %}

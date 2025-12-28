@@ -1,0 +1,8 @@
+{{ request_obj.applicant.get_display_name }} さんから承認依頼が届いています。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+現在のステップ: {{ request_obj.current_step }}
+
+システムにログインして内容をご確認の上、承認または差戻しを行ってください。
+{{ link }}

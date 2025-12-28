@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}{{ req.title }} - 申請詳細{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'portal:index' %}">ホーム</a></li>
+                <li class="breadcrumb-item active" aria-current="page">申請詳細</li>
+            </ol>
+        </nav>
+
+        {% if permission_denied %}
+            <div class="alert alert-danger" role="alert">
+                <h4 class="alert-heading">閲覧権限がありません</h4>
+                <p>この申請は閲覧制限が設定されており、関係者のみ閲覧可能です。</p>
+            </div>
+        {% else %}
+            <!-- 申請ヘッダー -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="badge bg-secondary me-2">{{ req.get_status_display }}</span>
+                        <span class="text-muted small">{{ req.request_number }}</span>
+                    </div>
+                    <div>
+                        {% if can_resubmit %}
+                            <a href="{% url 'approvals:update' req.id %}" class="btn btn-sm btn-primary me-2">
+                                <i class="bi bi-pencil-square me-1"></i>再申請
+                            </a>
+                        {% endif %}
+                        {% if can_withdraw %}
+                            <form action="{% url 'approvals:withdraw' req.id %}" method="post" class="d-inline" onsubmit="return confirm('本当に取り下げますか？');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-x-circle me-1"></i>取り下げ
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <h2 class="h4 mb-3">
+                        {{ req.title }}
+                        {% if req.is_restricted %}
+                            <i class="bi bi-lock-fill text-secondary ms-2" title="閲覧制限あり"></i>
+                        {% endif %}
+                    </h2>
+                    <div class="d-flex justify-content-between mb-3 text-muted small">
+                         <div>申請日: {{ req.submitted_at|date:"Y/m/d H:i" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-2 text-muted">申請者</div>
+                        <div class="col-md-10">{{ req.applicant.get_display_name }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-2 text-muted">内容</div>
+                        <div class="col-md-10" style="white-space: pre-wrap;">{{ req.content }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- アクションエリア（承認者のみ表示） -->
+            {% if can_approve %}
+                <div class="card mb-4 border-primary shadow">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-pencil-square me-2"></i>承認アクション
+                    </div>
+                    <div class="card-body bg-light">
+                        <form action="{% url 'approvals:action' req.id %}" method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="{{ action_form.comment.id_for_label }}" class="form-label">
+                                    {{ action_form.comment.label }}
+                                </label>
+                                {{ action_form.comment }}
+                                <div class="form-text text-muted">{{ action_form.comment.help_text }}</div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" name="action" value="approve" class="btn btn-success flex-grow-1">
+                                    承認する
+                                </button>
+                                <button type="submit" name="action" value="remand" class="btn btn-warning flex-grow-1">
+                                    差戻す
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-danger flex-grow-1">
+                                    却下する
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- 承認ルート状況 -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light">承認ルート</div>
+                <div class="card-body p-0">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 10%;">順序</th>
+                                <th style="width: 30%;">承認者</th>
+                                <th style="width: 20%;">状態</th>
+                                <th style="width: 20%;">処理日時</th>
+                                <th style="width: 20%;">コメント</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for approver in req.approvers.all %}
+                                <tr {% if approver.order == req.current_step and req.status == 1 %}class="table-warning border-start border-5 border-warning"{% endif %}>
+                                    <td class="text-center">{{ approver.order }}</td>
+                                    <td>{{ approver.user.get_display_name }}</td>
+                                    <td>
+                                        {% if approver.status == 0 %}
+                                            <span class="badge bg-secondary">未処理</span>
+                                        {% elif approver.status == 1 %}
+                                            <span class="badge bg-success">承認</span>
+                                        {% elif approver.status == 2 %}
+                                            <span class="badge bg-warning text-dark">差戻</span>
+                                        {% elif approver.status == 9 %}
+                                            <span class="badge bg-danger">却下</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ approver.processed_at|date:"Y/m/d H:i"|default:"-" }}</td>
+                                    <td>{{ approver.comment|default:"-"|linebreaksbr }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 履歴ログ -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">履歴ログ</div>
+                <ul class="list-group list-group-flush">
+                    {% for log in req.logs.all %}
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>{{ log.actor.get_display_name }}</strong> が
+                                    <span class="badge bg-info text-dark">{{ log.get_action_display }}</span> しました。
+                                </div>
+                                <small class="text-muted">{{ log.created_at|date:"Y/m/d H:i:s" }}</small>
+                            </div>
+                            {% if log.comment %}
+                                <div class="mt-1 small text-muted">
+                                    <i class="bi bi-chat-left-text me-1"></i> {{ log.comment }}
+                                </div>
+                            {% endif %}
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted">履歴はありません。</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- 管理者用エリア -->
+            {% if can_proxy_remand %}
+                <div class="card border-warning shadow">
+                    <div class="card-header bg-warning text-dark">
+                        <i class="bi bi-shield-lock-fill me-2"></i>管理者メニュー（代理差戻し）
+                    </div>
+                    <div class="card-body bg-light">
+                        <p class="small text-muted mb-3">
+                            管理者権限で強制的に申請を「差戻し」状態に変更します。<br>
+                            現在の承認ステップは中断され、申請者に差し戻されます。
+                        </p>
+                        <form action="{% url 'approvals:proxy-remand' req.id %}" method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="proxy_comment" class="form-label">
+                                    コメント <span class="badge bg-danger">必須</span>
+                                </label>
+                                <textarea name="comment" id="proxy_comment" class="form-control" rows="2" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100" onsubmit="return confirm('強制的に差戻しますか？');">
+                                代理差戻しを実行
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

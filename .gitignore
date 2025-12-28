@@ -1,0 +1,13 @@
+config/.secrets.toml
+config/local_settings.py
+__pycache__/
+*/migrations/[0-9][0-9][0-9][0-9]_*.py
+*.sql
+db.*
+*.json
+*.json.gz
+*.log
+*.log.gz
+*.pid
+*.~*
+*~

@@ -1,0 +1,9 @@
+申請の承認が完了しました。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+申請者: {{ request_obj.applicant.get_display_name }}
+
+全ての承認ステップが完了し、最終承認されました。
+以下のリンクから詳細を確認できます。
+{{ link }}

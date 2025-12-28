@@ -1,0 +1,8 @@
+{{ request_obj.applicant.get_display_name }} さんから再承認依頼が届いています。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+
+内容が修正され、再申請されました。
+システムにログインして内容をご確認ください。
+{{ link }}

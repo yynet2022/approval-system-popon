@@ -1,0 +1,50 @@
+<div id="notification-list-container">
+    <div class="list-group shadow-sm">
+        {% for notification in notifications %}
+            <a href="{% url 'notification:detail' notification.id %}" class="list-group-item list-group-item-action py-3">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ notification.title }}</h5>
+                    <small class="text-muted">{{ notification.published_at|date:"Y/m/d H:i" }}</small>
+                </div>
+                <small class="text-muted text-truncate d-block" style="max-width: 80%;">
+                    {{ notification.content|truncatechars:50 }}
+                </small>
+            </a>
+        {% empty %}
+            <div class="list-group-item text-muted text-center py-4">
+                現在、新しいお知らせはありません。
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- お知らせページネーション -->
+    {% if notifications.has_other_pages %}
+    <nav aria-label="Notification Page navigation" class="mt-3">
+        <ul class="pagination justify-content-start pagination-sm">
+            {% if notifications.has_previous %}
+                <li class="page-item">
+                    <button class="page-link ajax-pagination" data-target="notification" data-page="{{ notifications.previous_page_number }}">
+                        前へ
+                    </button>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">前へ</span></li>
+            {% endif %}
+
+            <li class="page-item active" aria-current="page">
+                <span class="page-link">{{ notifications.number }} / {{ notifications.paginator.num_pages }}</span>
+            </li>
+
+            {% if notifications.has_next %}
+                <li class="page-item">
+                    <button class="page-link ajax-pagination" data-target="notification" data-page="{{ notifications.next_page_number }}">
+                        次へ
+                    </button>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">次へ</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>

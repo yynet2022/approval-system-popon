@@ -1,0 +1,11 @@
+申請が管理者により代理差戻しされました。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+実行者: {{ actor.get_display_name }} (管理者)
+
+コメント:
+{{ comment }}
+
+内容を確認し、必要に応じて修正・再申請を行ってください。
+{{ link }}

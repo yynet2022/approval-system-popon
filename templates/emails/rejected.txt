@@ -1,0 +1,11 @@
+申請が却下されました。
+
+申請番号: {{ request_obj.request_number }}
+件名: {{ request_obj.title }}
+却下実行者: {{ actor.get_display_name }}
+
+コメント:
+{{ comment }}
+
+この申請は却下されたため、これ以上の操作はできません。
+{{ link }}
