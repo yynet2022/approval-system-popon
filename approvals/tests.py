@@ -353,3 +353,132 @@ class ApprovalWorkflowTest(TestCase):
 
         req.refresh_from_db()
         self.assertEqual(req.status, SimpleRequest.STATUS_APPROVED)
+
+    def test_withdraw_from_remanded(self):
+        """差戻し状態からの取り下げテスト"""
+        # 差戻し状態の申請を作成
+        req = SimpleRequest.objects.create(
+            title="差戻し取り下げテスト", applicant=self.applicant,
+            status=SimpleRequest.STATUS_REMANDED,
+            request_number="REQ-REM-WD"
+        )
+        # 承認者（差戻しを実行したという想定）
+        SimpleApprover.objects.create(
+            request=req, user=self.approver1, order=1,
+            status=SimpleApprover.STATUS_REMANDED
+        )
+
+        # メールボックスをクリア（ここまでの通知などは無視）
+        mail.outbox = []
+
+        # 申請者ログイン
+        self.client.force_login(self.applicant)
+        withdraw_url = reverse("approvals:withdraw", kwargs={"pk": req.id})
+
+        # 取り下げ実行
+        self.client.post(withdraw_url)
+
+        req.refresh_from_db()
+
+        # 検証1: ステータスが取り下げになっているか
+        self.assertEqual(req.status, SimpleRequest.STATUS_WITHDRAWN)
+
+        # 検証2: 承認者データが物理削除されていないか
+        self.assertEqual(req.approvers.count(), 1)
+
+        # 検証3: メールが送信されていないか
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_reject_after_approval(self):
+        """承認完了後の事後却下テスト"""
+        req = SimpleRequest.objects.create(
+            title="事後却下", applicant=self.applicant,
+            status=SimpleRequest.STATUS_APPROVED,  # 既に承認済み
+            request_number="REQ-POST-REJ"
+        )
+        SimpleApprover.objects.create(
+            request=req, user=self.approver1, order=1,
+            status=SimpleApprover.STATUS_APPROVED
+        )
+
+        self.client.force_login(self.approver1)
+        action_url = reverse("approvals:action", kwargs={"pk": req.id})
+
+        # 事後却下実行
+        self.client.post(
+            action_url, {"action": "reject", "comment": "やっぱりダメ"}
+        )
+
+        req.refresh_from_db()
+        self.assertEqual(req.status, SimpleRequest.STATUS_REJECTED)
+
+    def test_approve_skip_order(self):
+        """順番抜かし承認の防止テスト"""
+        req = SimpleRequest.objects.create(
+            title="順序テスト", applicant=self.applicant,
+            status=SimpleRequest.STATUS_PENDING,
+            request_number="REQ-ORDER",
+            current_step=1
+        )
+        # 1番目: approver1 (未承認)
+        SimpleApprover.objects.create(
+            request=req, user=self.approver1, order=1,
+            status=SimpleApprover.STATUS_PENDING
+        )
+        # 2番目: approver2 (未承認)
+        SimpleApprover.objects.create(
+            request=req, user=self.approver2, order=2,
+            status=SimpleApprover.STATUS_PENDING
+        )
+
+        # 2番目の人(approver2)が無理やり承認を試みる
+        self.client.force_login(self.approver2)
+        action_url = reverse("approvals:action", kwargs={"pk": req.id})
+
+        response = self.client.post(
+            action_url, {"action": "approve"}, follow=True
+        )
+
+        # エラーメッセージなどで弾かれているか確認
+        self.assertContains(response, "権限がありません")
+
+        req.refresh_from_db()
+        # ステップが進んでいないこと
+        self.assertEqual(req.current_step, 1)
+        # ステータスが変わっていないこと
+        self.assertEqual(req.status, SimpleRequest.STATUS_PENDING)
+
+    def test_reject_skip_order(self):
+        """順番抜かし却下の防止テスト"""
+        req = SimpleRequest.objects.create(
+            title="順序テスト(却下)", applicant=self.applicant,
+            status=SimpleRequest.STATUS_PENDING,
+            request_number="REQ-ORDER-REJ",
+            current_step=1
+        )
+        # 1番目: approver1 (未承認)
+        SimpleApprover.objects.create(
+            request=req, user=self.approver1, order=1,
+            status=SimpleApprover.STATUS_PENDING
+        )
+        # 2番目: approver2 (未承認)
+        SimpleApprover.objects.create(
+            request=req, user=self.approver2, order=2,
+            status=SimpleApprover.STATUS_PENDING
+        )
+
+        # 2番目の人(approver2)が無理やり却下を試みる
+        self.client.force_login(self.approver2)
+        action_url = reverse("approvals:action", kwargs={"pk": req.id})
+
+        # 現状の実装だとこれが通ってしまう可能性がある
+        response = self.client.post(
+            action_url, {"action": "reject", "comment": "フライング却下"}, follow=True
+        )
+
+        # エラーになるべき
+        self.assertContains(response, "権限がありません")
+
+        req.refresh_from_db()
+        # ステータスが変わっていないこと(Pendingのまま)
+        self.assertEqual(req.status, SimpleRequest.STATUS_PENDING)

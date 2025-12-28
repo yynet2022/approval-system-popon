@@ -63,10 +63,14 @@
             </div>
 
             <!-- アクションエリア（承認者のみ表示） -->
-            {% if can_approve %}
-                <div class="card mb-4 border-primary shadow">
-                    <div class="card-header bg-primary text-white">
-                        <i class="bi bi-pencil-square me-2"></i>承認アクション
+            {% if can_approve or can_reject_after_approval %}
+                <div class="card mb-4 {% if can_reject_after_approval %}border-danger{% else %}border-primary{% endif %} shadow">
+                    <div class="card-header {% if can_reject_after_approval %}bg-danger{% else %}bg-primary{% endif %} text-white">
+                        {% if can_reject_after_approval %}
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>事後却下
+                        {% else %}
+                            <i class="bi bi-pencil-square me-2"></i>承認アクション
+                        {% endif %}
                     </div>
                     <div class="card-body bg-light">
                         <form action="{% url 'approvals:action' req.id %}" method="post">
@@ -79,12 +83,14 @@
                                 <div class="form-text text-muted">{{ action_form.comment.help_text }}</div>
                             </div>
                             <div class="d-flex gap-2">
-                                <button type="submit" name="action" value="approve" class="btn btn-success flex-grow-1">
-                                    承認する
-                                </button>
-                                <button type="submit" name="action" value="remand" class="btn btn-warning flex-grow-1">
-                                    差戻す
-                                </button>
+                                {% if can_approve %}
+                                    <button type="submit" name="action" value="approve" class="btn btn-success flex-grow-1">
+                                        承認する
+                                    </button>
+                                    <button type="submit" name="action" value="remand" class="btn btn-warning flex-grow-1">
+                                        差戻す
+                                    </button>
+                                {% endif %}
                                 <button type="submit" name="action" value="reject" class="btn btn-danger flex-grow-1">
                                     却下する
                                 </button>

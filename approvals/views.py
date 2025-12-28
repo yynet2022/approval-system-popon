@@ -275,11 +275,20 @@ class RequestDetailView(DetailView):
         context["current_approver"] = current_approver
         context["action_form"] = ActionForm()
 
+        # 事後却下可能フラグ (承認完了後に、承認ルートに含まれるユーザーのみ可能)
+        can_reject_after_approval = False
+        if user.is_authenticated and \
+           req.status == SimpleRequest.STATUS_APPROVED:
+            if req.approvers.filter(user=user).exists():
+                can_reject_after_approval = True
+        context["can_reject_after_approval"] = can_reject_after_approval
+
         # 申請者向けアクションフラグ
         if user.is_authenticated and req.applicant == user:
             context["can_withdraw"] = req.status in [
                 SimpleRequest.STATUS_PENDING,
-                SimpleRequest.STATUS_APPROVED
+                SimpleRequest.STATUS_APPROVED,
+                SimpleRequest.STATUS_REMANDED
             ]
             context["can_resubmit"] = (
                 req.status == SimpleRequest.STATUS_REMANDED
@@ -337,27 +346,60 @@ class RequestActionView(LoginRequiredMixin, View):
                 # ロック取得して再取得
                 req = SimpleRequest.objects.select_for_update().get(pk=pk)
 
-                # ステータスチェック
-                if req.status != SimpleRequest.STATUS_PENDING:
-                    messages.error(
-                        request,
-                        "この申請は既に処理されているか、"
-                        "取り下げられています。"
-                    )
-                    return redirect("approvals:detail", pk=pk)
+                # ステータスチェック & 承認者特定ロジック
+                approver = None
 
-                # 承認者チェック
-                approver = SimpleApprover.objects.select_for_update().filter(
-                    request=req,
-                    order=req.current_step,
-                    user=request.user,
-                    status=SimpleApprover.STATUS_PENDING
-                ).first()
+                if action == "reject":
+                    # 却下は Pending または Approved で可能（事後却下）
+                    if req.status not in [SimpleRequest.STATUS_PENDING,
+                                          SimpleRequest.STATUS_APPROVED]:
+                        messages.error(
+                            request,
+                            "この申請は却下可能な状態ではありません（既に却下・取下・差戻済など）。"
+                        )
+                        return redirect("approvals:detail", pk=pk)
+
+                    if req.status == SimpleRequest.STATUS_APPROVED:
+                        # 事後却下: ルートに含まれる自分自身のレコードを取得（ステップ不問）
+                        approver = SimpleApprover.objects \
+                                                 .select_for_update() \
+                                                 .filter(
+                                                     request=req,
+                                                     user=request.user
+                                                 ).first()
+                    else:
+                        # 通常却下 (Pending時): 現在の承認者のみ可能（フライング防止）
+                        approver = SimpleApprover \
+                            .objects.select_for_update().filter(
+                                request=req,
+                                order=req.current_step,
+                                user=request.user,
+                                status=SimpleApprover.STATUS_PENDING
+                            ).first()
+
+                else:
+                    # 承認・差戻しは Pending のみ
+                    if req.status != SimpleRequest.STATUS_PENDING:
+                        messages.error(
+                            request,
+                            "この申請は既に処理されているか、"
+                            "取り下げられています。"
+                        )
+                        return redirect("approvals:detail", pk=pk)
+
+                    # 承認・差戻しは「現在のステップ」の担当者のみ
+                    approver = SimpleApprover \
+                        .objects.select_for_update().filter(
+                            request=req,
+                            order=req.current_step,
+                            user=request.user,
+                            status=SimpleApprover.STATUS_PENDING
+                        ).first()
 
                 if not approver:
                     messages.error(
                         request,
-                        "あなたはこの申請の現在の承認者ではありません。"
+                        "あなたはこの申請に対して操作を行う権限がありません。"
                     )
                     return redirect("approvals:detail", pk=pk)
 
@@ -476,18 +518,32 @@ class RequestWithdrawView(LoginRequiredMixin, View):
             with transaction.atomic():
                 req = SimpleRequest.objects.select_for_update().get(pk=pk)
 
-                # ステータスチェック：Pending または Approved
+                # ステータスチェック：Pending, Approved, Remanded
                 if req.status not in [
                         SimpleRequest.STATUS_PENDING,
-                        SimpleRequest.STATUS_APPROVED
+                        SimpleRequest.STATUS_APPROVED,
+                        SimpleRequest.STATUS_REMANDED
                 ]:
                     messages.error(
                         request, "この申請は取り下げ可能な状態ではありません。"
                     )
                     return redirect("approvals:detail", pk=pk)
 
+                # 差戻しからの取り下げの場合、承認者データを削除し通知もしない
+                is_remanded_withdraw = (
+                    req.status == SimpleRequest.STATUS_REMANDED)
+
                 req.status = SimpleRequest.STATUS_WITHDRAWN
                 req.save()
+
+                if is_remanded_withdraw:
+                    # 承認者リストを物理削除（DB的にも空にする）
+                    # req.approvers.all().delete()
+                    pass
+                else:
+                    # メール通知（現在の承認者＆承認済み承認者）
+                    # 差戻し時以外のみ通知を送る
+                    NotificationService.send_withdrawn(req, request)
 
                 # ログ記録
                 SimpleApprovalLog.objects.create(
@@ -497,9 +553,6 @@ class RequestWithdrawView(LoginRequiredMixin, View):
                     step=None,
                     comment="申請者による取り下げ"
                 )
-
-                # メール通知（現在の承認者＆承認済み承認者）
-                NotificationService.send_withdrawn(req, request)
 
             messages.info(request, "申請を取り下げました。")
 
