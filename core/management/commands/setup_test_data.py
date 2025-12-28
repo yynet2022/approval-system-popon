@@ -1,9 +1,17 @@
-from django.core.management.base import BaseCommand
+from datetime import date, timedelta
+
 from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import timedelta, date
+
+from approvals.models import (
+    ApprovalLog,
+    Approver,
+    LocalBusinessTripRequest,
+    Request,
+    SimpleRequest,
+)
 from notification.models import Notification
-from approvals.models import Request, SimpleRequest, LocalBusinessTripRequest, Approver, ApprovalLog
 
 User = get_user_model()
 
@@ -65,19 +73,27 @@ class Command(BaseCommand):
             user.last_name = data["last"]
             user.first_name = data["first"]
             user.is_active = True
-            
+
             if data["role"] == "admin":
                 user.is_staff = True
                 user.is_superuser = True
                 if created:
                     user.set_password("admin")
-            
-            user.is_approver = (data["role"] == "approver" or data["role"] == "admin")
+
+            user.is_approver = (
+                data["role"] == "approver" or data["role"] == "admin"
+            )
             user.save()
-            
+
             if created:
-                role_display = "管理者" if data["role"] == "admin" else "承認者" if data["role"] == "approver" else "一般"
-                self.stdout.write(f"ユーザー作成: {user.get_display_name()} ({role_display})")
+                role_display = (
+                    "管理者" if data["role"] == "admin"
+                    else "承認者" if data["role"] == "approver"
+                    else "一般"
+                )
+                self.stdout.write(
+                    f"ユーザー作成: {user.get_display_name()} ({role_display})"
+                )
 
     def create_notifications(self):
         """お知らせ作成（a.pyの内容を復元）"""
@@ -120,113 +136,118 @@ class Command(BaseCommand):
 
         # 1. 申請中（リーダー承認待ち） - a.py復元
         self.make_simple(
-            "REQ-TEST-001", yamada, "PC購入申請", "スペック不足のため買い替えをお願いします。",
+            "REQ-S-TEST-0001", yamada, "PC購入申請",
+            "スペック不足のため買い替えをお願いします。",
             Request.STATUS_PENDING, 1,
             [(leader, 0), (kacho, 0)]
         )
 
         # 2. 申請中（課長承認待ち / リーダー承認済み） - a.py復元
         self.make_simple(
-            "REQ-TEST-002", yamada, "出張旅費精算", "大阪出張の交通費です。",
+            "REQ-S-TEST-0002", yamada, "出張旅費精算",
+            "大阪出張の交通費です。",
             Request.STATUS_PENDING, 2,
             [(leader, 1, "OKです"), (kacho, 0)]
         )
 
         # 3. 承認完了 - a.py復元
         self.make_simple(
-            "REQ-TEST-003", yamada, "備品購入", "マウスが壊れました。",
+            "REQ-S-TEST-0003", yamada, "備品購入", "マウスが壊れました。",
             Request.STATUS_APPROVED, 2,
             [(leader, 1, "どうぞ")]
         )
 
-        # 4. 閲覧制限付き - a.py復元
+        # 4. 閲覧制限付き（部長決裁のみ） - a.py復元
         self.make_simple(
-            "REQ-TEST-SEC", yamada, "人事に関する相談", "極秘事項です。",
+            "REQ-S-TEST-0004", yamada, "人事に関する相談", "極秘事項です。",
             Request.STATUS_PENDING, 1,
             [(bucho, 0)], is_restricted=True
         )
 
         # 5. 却下（佐藤課長が却下）
         self.make_simple(
-            "REQ-S-REJ", yamada, "高級家具購入", "オフィス用ソファ。",
+            "REQ-S-TEST-0005", yamada, "高級家具購入", "オフィス用ソファ。",
             Request.STATUS_REJECTED, 1,
             [(kacho, 9, "予算オーバーです")]
         )
 
         # 6. 差戻し（鈴木リーダーから）
         self.make_simple(
-            "REQ-S-REM", yamada, "研修参加希望", "1月のカンファレンス。",
+            "REQ-S-TEST-0006", yamada, "研修参加希望", "Pythonセミナー。",
             Request.STATUS_REMANDED, 1,
-            [(leader, 2, "参加費用の詳細を教えてください")]
+            [(leader, 2, "詳細希望")]
         )
 
     def create_trip_requests(self):
         """近距離出張申請の網羅データ追加"""
-        sato_j = User.objects.get(email="sato@example.com") # 佐藤次郎さん
+        sato_j = User.objects.get(email="sato@example.com")  # 佐藤次郎さん
         yamada = User.objects.get(email="yamada@example.com")
         leader = User.objects.get(email="leader@example.com")
         kacho = User.objects.get(email="kacho@example.com")
         bucho = User.objects.get(email="bucho@example.com")
 
-        # 1. 申請中（リーダー待ち）
+        # 1. 申請中（佐藤課長待ち）
         self.make_trip(
-            "REQ-L-001", sato_j, "大阪支社打ち合わせ", date(2026, 1, 15), "大阪支社", "新プロジェクトのキックオフ会議",
+            "REQ-L-TEST-0001", sato_j, "大阪支社訪問",
+            date(2026, 1, 10), "大阪支社", "定例会議",
             Request.STATUS_PENDING, 1,
-            [(leader, 0), (kacho, 0)]
+            [(kacho, 0)]
         )
 
-        # 2. 承認完了（部長まで完了）
+        # 2. 承認完了（部長まで）
         self.make_trip(
-            "REQ-L-002", yamada, "東京本社出張", date(2025, 12, 10), "東京本社", "全社ミーティング出席",
-            Request.STATUS_APPROVED, 4,
-            [(leader, 1, "了解"), (kacho, 1, "承認します"), (bucho, 1, "決裁")]
+            "REQ-L-TEST-0002", yamada, "名古屋工場視察",
+            date(2025, 12, 20), "名古屋工場", "現場確認",
+            Request.STATUS_APPROVED, 3,
+            [
+                (kacho, 1, "OK"),
+                (bucho, 1, "承認")
+            ]
         )
 
-        # 3. 却下（課長が決断）
+        # 3. 差戻し (田中部長から)
         self.make_trip(
-            "REQ-L-003", sato_j, "名古屋工場視察（自称）", date(2026, 1, 20), "名古屋", "ちょっと様子を見に",
-            Request.STATUS_REJECTED, 2,
-            [(leader, 1, "一応OK"), (kacho, 9, "目的が不明確です。")]
+            "REQ-L-TEST-0003", yamada, "京都営業所訪問",
+            date(2026, 2, 1), "京都営業所", "同行",
+            Request.STATUS_REMANDED, 2,
+            [
+                (kacho, 1),
+                (bucho, 2, "同行者名を入れて")
+            ]
         )
 
-        # 4. 差戻し（部長から）
+        # 4. 取り下げ
         self.make_trip(
-            "REQ-L-004", yamada, "京都営業所訪問", date(2026, 2, 1), "京都営業所", "顧客同行",
-            Request.STATUS_REMANDED, 3,
-            [(leader, 1), (kacho, 1), (bucho, 2, "同行する顧客リストを出してください")]
-        )
-
-        # 5. 取り下げ（申請者がミスに気づいた）
-        self.make_trip(
-            "REQ-L-005", sato_j, "誤記申請", date(2026, 3, 1), "不明", "テスト送信",
+            "REQ-L-TEST-0004", sato_j, "不要な申請",
+            date(2026, 3, 1), "不明", "テスト",
             Request.STATUS_WITHDRAWN, 1,
             [(leader, 0)]
         )
 
-        # 6. 非公開・申請中（課長待ち）
-        self.make_trip(
-            "REQ-L-SEC", yamada, "極秘顧客訪問", date(2026, 1, 5), "内緒", "重要案件",
-            Request.STATUS_PENDING, 2,
-            [(leader, 1, "極秘了解"), (kacho, 0)], is_restricted=True
-        )
-
-    def make_simple(self, num, applicant, title, content, status, step, route, is_restricted=False):
+    def make_simple(self, num, applicant, title, content,
+                    status, step, route, is_restricted=False):
         """SimpleRequest作成補助"""
-        if Request.objects.filter(request_number=num).exists(): return
+        if Request.objects.filter(request_number=num).exists():
+            return
         req = SimpleRequest.objects.create(
-            request_number=num, applicant=applicant, title=title, content=content,
-            status=status, current_step=step, is_restricted=is_restricted, submitted_at=timezone.now() - timedelta(hours=1)
+            request_number=num, applicant=applicant, title=title,
+            content=content, status=status, current_step=step,
+            is_restricted=is_restricted,
+            submitted_at=timezone.now() - timedelta(hours=1)
         )
         self._set_route(req, applicant, route)
         self.stdout.write(f"簡易申請作成: {title} (No: {num})")
 
-    def make_trip(self, num, applicant, title, t_date, dest, note, status, step, route, is_restricted=False):
+    def make_trip(self, num, applicant, title, t_date, dest, note,
+                  status, step, route, is_restricted=False):
         """LocalBusinessTripRequest作成補助"""
-        if Request.objects.filter(request_number=num).exists(): return
+        if Request.objects.filter(request_number=num).exists():
+            return
         req = LocalBusinessTripRequest.objects.create(
-            request_number=num, applicant=applicant, title=title, trip_date=t_date,
-            destination=dest, note=note, status=status, current_step=step,
-            is_restricted=is_restricted, submitted_at=timezone.now() - timedelta(hours=2)
+            request_number=num, applicant=applicant, title=title,
+            trip_date=t_date, destination=dest, note=note, status=status,
+            current_step=step, is_restricted=is_restricted,
+            submitted_at=timezone.now() - timedelta(hours=2)
         )
         self._set_route(req, applicant, route)
         self.stdout.write(f"出張申請作成: {title} (No: {num})")
@@ -235,32 +256,39 @@ class Command(BaseCommand):
         """承認ルートとログの作成"""
         # 申請ログ
         ApprovalLog.objects.create(
-            request=req, actor=applicant, action=ApprovalLog.ACTION_SUBMIT, step=None, comment="新規申請"
+            request=req, actor=applicant, action=ApprovalLog.ACTION_SUBMIT,
+            step=None, comment="新規申請"
         )
-        
+
         for i, data in enumerate(route, start=1):
             user = data[0]
             status = data[1]
             comment = data[2] if len(data) > 2 else ""
-            
+
             Approver.objects.create(
                 request=req, user=user, order=i, status=status,
-                comment=comment, processed_at=timezone.now() if status != 0 else None
+                comment=comment,
+                processed_at=timezone.now() if status != 0 else None
             )
-            
+
             if status != 0:
-                action = ApprovalLog.ACTION_APPROVE if status == 1 else \
-                         ApprovalLog.ACTION_REMAND if status == 2 else \
-                         ApprovalLog.ACTION_REJECT if status == 9 else None
+                action = (
+                    ApprovalLog.ACTION_APPROVE if status == 1 else
+                    ApprovalLog.ACTION_REMAND if status == 2 else
+                    ApprovalLog.ACTION_REJECT if status == 9 else None
+                )
                 if action:
                     ApprovalLog.objects.create(
-                        request=req, actor=user, action=action, step=i, comment=comment
+                        request=req, actor=user, action=action,
+                        step=i, comment=comment
                     )
-        
+
         # 最終的な取下ログなど
         if req.status == Request.STATUS_WITHDRAWN:
             ApprovalLog.objects.create(
-                request=req, actor=applicant, action=ApprovalLog.ACTION_WITHDRAW, step=None, comment="申請を取り下げました"
+                request=req, actor=applicant,
+                action=ApprovalLog.ACTION_WITHDRAW, step=None,
+                comment="取り下げます"
             )
 
     def log(self, req, actor, action, comment, step=None):

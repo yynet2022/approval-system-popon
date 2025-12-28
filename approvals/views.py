@@ -56,7 +56,9 @@ def validate_approvers(request, approvers_list):
     # 連続した重複チェック (A -> A は不可)
     for i in range(len(approvers_list) - 1):
         if approvers_list[i] == approvers_list[i+1]:
-            messages.error(request, "同じ承認者を連続して設定することはできません。")
+            messages.error(
+                request, "同じ承認者を連続して設定することはできません。"
+            )
             return False
 
     return True
@@ -153,7 +155,9 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
                     self.object, first_approver, self.request
                 )
 
-            messages.success(self.request, f"申請 {request_number} を提出しました。")
+            messages.success(
+                self.request, f"申請 {request_number} を提出しました。"
+            )
             return redirect(self.success_url)
 
         except Exception as e:
@@ -187,10 +191,10 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         """
-        Requestオブジェクトを取得し、具体的な子モデルのインスタンスに変換して返す。
+        Requestオブジェクトを取得し、子モデルのインスタンスに変換して返す。
         """
         obj = super().get_object(queryset)
-        
+
         # 子モデルへのダウンキャスト
         if hasattr(obj, 'simplerequest'):
             return obj.simplerequest
@@ -247,19 +251,17 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
         try:
             with transaction.atomic():
                 # ロック取得 (親モデルでロック)
-                # self.object は get_object で子モデルになっているので、pkを使って再取得
                 self.object = Request.objects.select_for_update().get(
                     pk=self.object.pk
                 )
 
-                # 申請情報の更新 (form.saveを使うために、formのinstanceを更新)
-                # form.save() は子モデルのフィールドも保存してくれる
+                # 申請情報の更新
                 updated_object = form.save(commit=False)
                 updated_object.status = Request.STATUS_PENDING
                 updated_object.current_step = 1
                 updated_object.submitted_at = timezone.now()
                 updated_object.save()
-                
+
                 # self.object を更新後のものに置き換え
                 self.object = updated_object
 
@@ -310,11 +312,10 @@ class RequestDetailView(DetailView):
             "approvers__user",
             "logs__actor"
         )
-    
+
     def get_object(self, queryset=None):
         """
         表示用に子モデルのインスタンスを取得して返す。
-        これによりテンプレートで req.content や req.trip_date にアクセスできる。
         """
         obj = super().get_object(queryset)
         if hasattr(obj, 'simplerequest'):

@@ -44,7 +44,7 @@ class ApprovalWorkflowTest(TestCase):
         }
         response = self.client.post(url, data, follow=True)
         self.assertContains(response, "大阪出張")
-        
+
         # DB確認
         req = LocalBusinessTripRequest.objects.get(title="大阪出張")
         self.assertEqual(req.destination, "大阪支社")
@@ -495,7 +495,8 @@ class ApprovalWorkflowTest(TestCase):
 
         # 現状の実装だとこれが通ってしまう可能性がある
         response = self.client.post(
-            action_url, {"action": "reject", "comment": "フライング却下"}, follow=True
+            action_url, {"action": "reject", "comment": "フライング却下"},
+            follow=True
         )
 
         # エラーになるべき

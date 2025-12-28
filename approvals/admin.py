@@ -4,7 +4,6 @@ from .models import (
     ApprovalLog,
     Approver,
     LocalBusinessTripRequest,
-    Request,
     SimpleRequest,
 )
 
