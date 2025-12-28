@@ -8,7 +8,15 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>ポータル</h1>
         {% if user.is_authenticated %}
-            <a href="{% url 'approvals:create' %}" class="btn btn-primary btn-lg">新規申請</a>
+            <div class="dropdown">
+              <button class="btn btn-primary btn-lg dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                新規申請
+              </button>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="{% url 'approvals:create_simple' %}">簡易申請</a></li>
+                <li><a class="dropdown-item" href="{% url 'approvals:create_trip' %}">近距離出張申請</a></li>
+              </ul>
+            </div>
         {% endif %}
     </div>
 

@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.views.generic import TemplateView
 from django.shortcuts import render
 
-from approvals.models import SimpleApprover, SimpleRequest
+from approvals.models import Approver, Request
 from notification.models import Notification
 from .forms import SearchForm
 
@@ -30,17 +30,17 @@ class DashboardView(TemplateView):
         """申請一覧を取得してページネーション"""
         user = self.request.user
 
-        # ベースのクエリセット作成
+        # ベースのクエリセット作成 (全ての申請 Request を対象)
         if user.is_authenticated:
-            my_related_ids = SimpleRequest.objects.filter(
+            my_related_ids = Request.objects.filter(
                 Q(applicant=user) | Q(approvers__user=user)
             ).values_list("id", flat=True)
 
-            qs = SimpleRequest.objects.filter(
+            qs = Request.objects.filter(
                 Q(is_restricted=False) | Q(id__in=my_related_ids)
             )
         else:
-            qs = SimpleRequest.objects.filter(is_restricted=False)
+            qs = Request.objects.filter(is_restricted=False)
 
         # 検索フィルタ適用
         if form.is_valid():
@@ -103,18 +103,18 @@ class DashboardView(TemplateView):
 
         # 2. 承認依頼（ログイン時のみ）
         if user.is_authenticated:
-            # 承認待ち
-            context["pending_approvals"] = SimpleRequest.objects.filter(
-                status=SimpleRequest.STATUS_PENDING,
+            # 承認待ち (Approver と Request で絞り込み)
+            context["pending_approvals"] = Request.objects.filter(
+                status=Request.STATUS_PENDING,
                 approvers__user=user,
-                approvers__status=SimpleApprover.STATUS_PENDING,
+                approvers__status=Approver.STATUS_PENDING,
                 approvers__order=F("current_step")
             ).select_related("applicant").distinct().order_by("submitted_at")
 
             # 差戻し（再申請待ち）
-            context["remanded_requests"] = SimpleRequest.objects.filter(
+            context["remanded_requests"] = Request.objects.filter(
                 applicant=user,
-                status=SimpleRequest.STATUS_REMANDED
+                status=Request.STATUS_REMANDED
             ).order_by("-updated_at")
 
         return context

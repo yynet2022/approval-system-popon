@@ -2,7 +2,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from accounts.models import User
-from approvals.models import SimpleRequest, SimpleApprover
+from approvals.models import SimpleRequest, Approver, Request
 
 
 class PortalViewTest(TestCase):
@@ -21,9 +21,9 @@ class PortalViewTest(TestCase):
         """「承認依頼」エリアの表示テスト"""
         req = SimpleRequest.objects.create(
             title="自分宛の依頼", applicant=self.user,
-            status=SimpleRequest.STATUS_PENDING, request_number="REQ-P1"
+            status=Request.STATUS_PENDING, request_number="REQ-P1"
         )
-        SimpleApprover.objects.create(
+        Approver.objects.create(
             request=req, user=self.approver, order=1
         )
 
@@ -38,11 +38,11 @@ class PortalViewTest(TestCase):
         # データ準備
         SimpleRequest.objects.create(
             title="承認済みりんご", applicant=self.user,
-            status=SimpleRequest.STATUS_APPROVED, request_number="REQ-AP"
+            status=Request.STATUS_APPROVED, request_number="REQ-AP"
         )
         SimpleRequest.objects.create(
             title="申請中みかん", applicant=self.user,
-            status=SimpleRequest.STATUS_PENDING, request_number="REQ-PE"
+            status=Request.STATUS_PENDING, request_number="REQ-PE"
         )
 
         url = reverse("portal:index")
@@ -53,7 +53,7 @@ class PortalViewTest(TestCase):
         self.assertNotContains(res_q, "申請中みかん")
 
         # ステータスフィルタ
-        status_approved = str(SimpleRequest.STATUS_APPROVED)
+        status_approved = str(Request.STATUS_APPROVED)
         res_s = self.client.get(url, {"status": status_approved})
         self.assertContains(res_s, "承認済みりんご")
         self.assertNotContains(res_s, "申請中みかん")

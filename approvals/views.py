@@ -8,8 +8,19 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
 
-from .forms import ActionForm, ApproverFormSet, RequestForm
-from .models import SimpleApprovalLog, SimpleApprover, SimpleRequest
+from .forms import (
+    ActionForm,
+    ApproverFormSet,
+    LocalBusinessTripRequestForm,
+    SimpleRequestForm,
+)
+from .models import (
+    ApprovalLog,
+    Approver,
+    LocalBusinessTripRequest,
+    Request,
+    SimpleRequest,
+)
 from .services import NotificationService
 
 logger = logging.getLogger(__name__)
@@ -20,11 +31,11 @@ def save_approvers(request_obj, approvers_list):
     承認者リストを保存するヘルパー関数。
     """
     for i, approver_user in enumerate(approvers_list, start=1):
-        SimpleApprover.objects.create(
+        Approver.objects.create(
             request=request_obj,
             user=approver_user,
             order=i,
-            status=SimpleApprover.STATUS_PENDING
+            status=Approver.STATUS_PENDING
         )
 
 
@@ -51,14 +62,14 @@ def validate_approvers(request, approvers_list):
     return True
 
 
-class RequestCreateView(LoginRequiredMixin, CreateView):
+class BaseRequestCreateView(LoginRequiredMixin, CreateView):
     """
-    新規申請作成ビュー。
+    申請作成の基底ビュー。
+    共通の保存ロジック（承認者設定、ログ記録、メール送信）を持つ。
     """
-    model = SimpleRequest
-    form_class = RequestForm
     template_name = "approvals/request_form.html"
     success_url = reverse_lazy("portal:index")
+    request_prefix = "REQ"  # サブクラスでオーバーライドする
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -67,6 +78,31 @@ class RequestCreateView(LoginRequiredMixin, CreateView):
         else:
             context["approver_formset"] = ApproverFormSet()
         return context
+
+    def generate_request_number(self):
+        """
+        申請番号を生成する。
+        形式: {PREFIX}-{YYYYMM}-{NNNN}
+        """
+        now = timezone.now()
+        yyyymm = now.strftime("%Y%m")
+        prefix = f"{self.request_prefix}-{yyyymm}"
+
+        # その月の最新の申請番号を取得してロック
+        # NOTE: Request全体で連番を共有するか、Prefixごとに分けるか。
+        # ここではPrefixごとに連番を振るロジックにする。
+        qs = Request.objects.select_for_update()
+        latest_request = qs.filter(
+            request_number__startswith=prefix
+        ).order_by("-request_number").first()
+
+        if latest_request:
+            last_num = int(latest_request.request_number.split("-")[-1])
+            new_num = last_num + 1
+        else:
+            new_num = 1
+
+        return f"{prefix}-{new_num:04d}"
 
     def form_valid(self, form):
         context = self.get_context_data()
@@ -88,43 +124,25 @@ class RequestCreateView(LoginRequiredMixin, CreateView):
 
         try:
             with transaction.atomic():
-                # 1. 採番ロックと申請番号生成
-                now = timezone.now()
-                yyyymm = now.strftime("%Y%m")
-                prefix = f"REQ-S-{yyyymm}"
-
-                # その月の最新の申請番号を取得してロック
-                qs = SimpleRequest.objects.select_for_update()
-                latest_request = qs.filter(
-                    request_number__startswith=prefix
-                ).order_by("-request_number").first()
-
-                if latest_request:
-                    last_num = int(
-                        latest_request.request_number.split("-")[-1]
-                    )
-                    new_num = last_num + 1
-                else:
-                    new_num = 1
-
-                request_number = f"{prefix}-{new_num:04d}"
+                # 1. 申請番号生成
+                request_number = self.generate_request_number()
 
                 # 2. 申請保存
                 self.object = form.save(commit=False)
                 self.object.request_number = request_number
                 self.object.applicant = self.request.user
-                self.object.status = SimpleRequest.STATUS_PENDING
-                self.object.submitted_at = now
+                self.object.status = Request.STATUS_PENDING
+                self.object.submitted_at = timezone.now()
                 self.object.save()
 
                 # 3. 承認者保存
                 save_approvers(self.object, approvers)
 
                 # 4. ログ記録
-                SimpleApprovalLog.objects.create(
+                ApprovalLog.objects.create(
                     request=self.object,
                     actor=self.request.user,
-                    action=SimpleApprovalLog.ACTION_SUBMIT,
+                    action=ApprovalLog.ACTION_SUBMIT,
                     step=None,
                     comment="新規申請"
                 )
@@ -144,20 +162,58 @@ class RequestCreateView(LoginRequiredMixin, CreateView):
             return self.render_to_response(context)
 
 
+class SimpleRequestCreateView(BaseRequestCreateView):
+    """簡易申請作成ビュー"""
+    model = SimpleRequest
+    form_class = SimpleRequestForm
+    request_prefix = "REQ-S"
+
+
+class LocalBusinessTripRequestCreateView(BaseRequestCreateView):
+    """近距離出張申請作成ビュー"""
+    model = LocalBusinessTripRequest
+    form_class = LocalBusinessTripRequestForm
+    request_prefix = "REQ-L"
+
+
 class RequestUpdateView(LoginRequiredMixin, UpdateView):
     """
     再申請ビュー。
+    申請タイプに応じてフォームを切り替える。
     """
-    model = SimpleRequest
-    form_class = RequestForm
+    model = Request
     template_name = "approvals/request_form.html"
     success_url = reverse_lazy("portal:index")
+
+    def get_object(self, queryset=None):
+        """
+        Requestオブジェクトを取得し、具体的な子モデルのインスタンスに変換して返す。
+        """
+        obj = super().get_object(queryset)
+        
+        # 子モデルへのダウンキャスト
+        if hasattr(obj, 'simplerequest'):
+            return obj.simplerequest
+        elif hasattr(obj, 'localbusinesstriprequest'):
+            return obj.localbusinesstriprequest
+        return obj
+
+    def get_form_class(self):
+        """
+        オブジェクトの型に応じてフォームクラスを返す。
+        """
+        obj = self.object
+        if isinstance(obj, SimpleRequest):
+            return SimpleRequestForm
+        elif isinstance(obj, LocalBusinessTripRequest):
+            return LocalBusinessTripRequestForm
+        return SimpleRequestForm  # フォールバック
 
     def get_queryset(self):
         # 申請者本人のもので、差戻し状態のものに限る
         return super().get_queryset().filter(
             applicant=self.request.user,
-            status=SimpleRequest.STATUS_REMANDED
+            status=Request.STATUS_REMANDED
         )
 
     def get_context_data(self, **kwargs):
@@ -178,7 +234,6 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
             return self.render_to_response(context)
 
         # 承認者リストの取得
-        # 再申請時はDELETEフラグは見ない（全洗い替えするため）
         approvers = [
             f.cleaned_data.get("user")
             for f in approver_formset
@@ -191,27 +246,32 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
 
         try:
             with transaction.atomic():
-                # ロック取得
-                self.object = SimpleRequest.objects.select_for_update().get(
+                # ロック取得 (親モデルでロック)
+                # self.object は get_object で子モデルになっているので、pkを使って再取得
+                self.object = Request.objects.select_for_update().get(
                     pk=self.object.pk
                 )
 
-                # 申請情報の更新
-                self.object = form.save(commit=False)
-                self.object.status = SimpleRequest.STATUS_PENDING
-                self.object.current_step = 1
-                self.object.submitted_at = timezone.now()
-                self.object.save()
+                # 申請情報の更新 (form.saveを使うために、formのinstanceを更新)
+                # form.save() は子モデルのフィールドも保存してくれる
+                updated_object = form.save(commit=False)
+                updated_object.status = Request.STATUS_PENDING
+                updated_object.current_step = 1
+                updated_object.submitted_at = timezone.now()
+                updated_object.save()
+                
+                # self.object を更新後のものに置き換え
+                self.object = updated_object
 
                 # 承認ルートの再構築 (全削除 -> 再作成)
                 self.object.approvers.all().delete()
                 save_approvers(self.object, approvers)
 
                 # ログ記録
-                SimpleApprovalLog.objects.create(
+                ApprovalLog.objects.create(
                     request=self.object,
                     actor=self.request.user,
-                    action=SimpleApprovalLog.ACTION_RESUBMIT,
+                    action=ApprovalLog.ACTION_RESUBMIT,
                     step=None,
                     comment="再申請"
                 )
@@ -239,18 +299,29 @@ class RequestDetailView(DetailView):
     """
     申請詳細画面。
     """
-    model = SimpleRequest
+    model = Request
     template_name = "approvals/request_detail.html"
     context_object_name = "req"
 
     def get_queryset(self):
-        # 関連データも一緒に取得（N+1問題対策）
         return super().get_queryset().select_related(
             "applicant"
         ).prefetch_related(
             "approvers__user",
             "logs__actor"
         )
+    
+    def get_object(self, queryset=None):
+        """
+        表示用に子モデルのインスタンスを取得して返す。
+        これによりテンプレートで req.content や req.trip_date にアクセスできる。
+        """
+        obj = super().get_object(queryset)
+        if hasattr(obj, 'simplerequest'):
+            return obj.simplerequest
+        elif hasattr(obj, 'localbusinesstriprequest'):
+            return obj.localbusinesstriprequest
+        return obj
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -261,12 +332,12 @@ class RequestDetailView(DetailView):
         can_approve = False
         current_approver = None
 
-        is_pending = req.status == SimpleRequest.STATUS_PENDING
+        is_pending = req.status == Request.STATUS_PENDING
         if user.is_authenticated and is_pending:
             current_approver = req.approvers.filter(
                 order=req.current_step,
                 user=user,
-                status=SimpleApprover.STATUS_PENDING
+                status=Approver.STATUS_PENDING
             ).first()
             if current_approver:
                 can_approve = True
@@ -275,10 +346,9 @@ class RequestDetailView(DetailView):
         context["current_approver"] = current_approver
         context["action_form"] = ActionForm()
 
-        # 事後却下可能フラグ (承認完了後に、承認ルートに含まれるユーザーのみ可能)
+        # 事後却下可能フラグ
         can_reject_after_approval = False
-        if user.is_authenticated and \
-           req.status == SimpleRequest.STATUS_APPROVED:
+        if user.is_authenticated and req.status == Request.STATUS_APPROVED:
             if req.approvers.filter(user=user).exists():
                 can_reject_after_approval = True
         context["can_reject_after_approval"] = can_reject_after_approval
@@ -286,12 +356,12 @@ class RequestDetailView(DetailView):
         # 申請者向けアクションフラグ
         if user.is_authenticated and req.applicant == user:
             context["can_withdraw"] = req.status in [
-                SimpleRequest.STATUS_PENDING,
-                SimpleRequest.STATUS_APPROVED,
-                SimpleRequest.STATUS_REMANDED
+                Request.STATUS_PENDING,
+                Request.STATUS_APPROVED,
+                Request.STATUS_REMANDED
             ]
             context["can_resubmit"] = (
-                req.status == SimpleRequest.STATUS_REMANDED
+                req.status == Request.STATUS_REMANDED
             )
         else:
             context["can_withdraw"] = False
@@ -299,7 +369,7 @@ class RequestDetailView(DetailView):
 
         # 管理者向け代理差戻しフラグ
         if user.is_staff and req.status in [
-            SimpleRequest.STATUS_PENDING, SimpleRequest.STATUS_APPROVED
+            Request.STATUS_PENDING, Request.STATUS_APPROVED
         ]:
             context["can_proxy_remand"] = True
         else:
@@ -325,7 +395,7 @@ class RequestActionView(LoginRequiredMixin, View):
     承認アクション実行ビュー。
     """
     def post(self, request, pk):
-        req = get_object_or_404(SimpleRequest, pk=pk)
+        req = get_object_or_404(Request, pk=pk)
         form = ActionForm(request.POST)
 
         if not form.is_valid():
@@ -335,65 +405,54 @@ class RequestActionView(LoginRequiredMixin, View):
         comment = form.cleaned_data["comment"]
         action = request.POST.get("action")
 
-        # アクションの種類判定
         if action not in ["approve", "remand", "reject"]:
             messages.error(request, "不正なアクションです。")
             return redirect("approvals:detail", pk=pk)
 
-        # 権限チェックとロック取得のためにトランザクション開始
         try:
             with transaction.atomic():
-                # ロック取得して再取得
-                req = SimpleRequest.objects.select_for_update().get(pk=pk)
-
-                # ステータスチェック & 承認者特定ロジック
+                req = Request.objects.select_for_update().get(pk=pk)
                 approver = None
 
                 if action == "reject":
-                    # 却下は Pending または Approved で可能（事後却下）
-                    if req.status not in [SimpleRequest.STATUS_PENDING,
-                                          SimpleRequest.STATUS_APPROVED]:
+                    if req.status not in [Request.STATUS_PENDING,
+                                          Request.STATUS_APPROVED]:
                         messages.error(
                             request,
-                            "この申請は却下可能な状態ではありません（既に却下・取下・差戻済など）。"
+                            "この申請は却下可能な状態ではありません。"
                         )
                         return redirect("approvals:detail", pk=pk)
 
-                    if req.status == SimpleRequest.STATUS_APPROVED:
-                        # 事後却下: ルートに含まれる自分自身のレコードを取得（ステップ不問）
-                        approver = SimpleApprover.objects \
-                                                 .select_for_update() \
-                                                 .filter(
-                                                     request=req,
-                                                     user=request.user
-                                                 ).first()
+                    if req.status == Request.STATUS_APPROVED:
+                        approver = Approver.objects \
+                                           .select_for_update() \
+                                           .filter(
+                                               request=req,
+                                               user=request.user
+                                           ).first()
                     else:
-                        # 通常却下 (Pending時): 現在の承認者のみ可能（フライング防止）
-                        approver = SimpleApprover \
-                            .objects.select_for_update().filter(
+                        approver = Approver.objects \
+                            .select_for_update().filter(
                                 request=req,
                                 order=req.current_step,
                                 user=request.user,
-                                status=SimpleApprover.STATUS_PENDING
+                                status=Approver.STATUS_PENDING
                             ).first()
 
                 else:
-                    # 承認・差戻しは Pending のみ
-                    if req.status != SimpleRequest.STATUS_PENDING:
+                    if req.status != Request.STATUS_PENDING:
                         messages.error(
                             request,
-                            "この申請は既に処理されているか、"
-                            "取り下げられています。"
+                            "この申請は既に処理されているか、取り下げられています。"
                         )
                         return redirect("approvals:detail", pk=pk)
 
-                    # 承認・差戻しは「現在のステップ」の担当者のみ
-                    approver = SimpleApprover \
-                        .objects.select_for_update().filter(
+                    approver = Approver.objects \
+                        .select_for_update().filter(
                             request=req,
                             order=req.current_step,
                             user=request.user,
-                            status=SimpleApprover.STATUS_PENDING
+                            status=Approver.STATUS_PENDING
                         ).first()
 
                 if not approver:
@@ -407,12 +466,10 @@ class RequestActionView(LoginRequiredMixin, View):
                 approver.processed_at = now
                 approver.comment = comment
 
-                # アクション別処理
                 if action == "approve":
-                    approver.status = SimpleApprover.STATUS_APPROVED
+                    approver.status = Approver.STATUS_APPROVED
                     approver.save()
 
-                    # 次のステップへ
                     next_step = req.current_step + 1
                     next_approver = req.approvers.filter(
                         order=next_step
@@ -421,20 +478,16 @@ class RequestActionView(LoginRequiredMixin, View):
                     if next_approver:
                         req.current_step = next_step
                         req.save()
-                        # 次の承認者へメール
                         NotificationService.send_approval_request(
                             req, next_approver.user, request
                         )
                     else:
-                        # 最終承認完了
-                        req.status = SimpleRequest.STATUS_APPROVED
+                        req.status = Request.STATUS_APPROVED
                         req.save()
-                        # 申請者へメール
                         NotificationService.send_approved(req, request)
 
-                    # ログ
                     self.log_action(
-                        req, request.user, SimpleApprovalLog.ACTION_APPROVE,
+                        req, request.user, ApprovalLog.ACTION_APPROVE,
                         req.current_step, comment
                     )
                     messages.success(request, "承認しました。")
@@ -443,20 +496,18 @@ class RequestActionView(LoginRequiredMixin, View):
                     if not comment:
                         raise ValueError("差戻しの場合はコメントが必須です。")
 
-                    approver.status = SimpleApprover.STATUS_REMANDED
+                    approver.status = Approver.STATUS_REMANDED
                     approver.save()
 
-                    req.status = SimpleRequest.STATUS_REMANDED
+                    req.status = Request.STATUS_REMANDED
                     req.save()
 
-                    # 申請者へメール
                     NotificationService.send_remanded(
                         req, request.user, comment, request
                     )
 
-                    # ログ
                     self.log_action(
-                        req, request.user, SimpleApprovalLog.ACTION_REMAND,
+                        req, request.user, ApprovalLog.ACTION_REMAND,
                         req.current_step, comment
                     )
                     messages.warning(request, "差戻しました。")
@@ -465,20 +516,18 @@ class RequestActionView(LoginRequiredMixin, View):
                     if not comment:
                         raise ValueError("却下の場合はコメントが必須です。")
 
-                    approver.status = SimpleApprover.STATUS_REJECTED
+                    approver.status = Approver.STATUS_REJECTED
                     approver.save()
 
-                    req.status = SimpleRequest.STATUS_REJECTED
+                    req.status = Request.STATUS_REJECTED
                     req.save()
 
-                    # 申請者へメール
                     NotificationService.send_rejected(
                         req, request.user, comment, request
                     )
 
-                    # ログ
                     self.log_action(
-                        req, request.user, SimpleApprovalLog.ACTION_REJECT,
+                        req, request.user, ApprovalLog.ACTION_REJECT,
                         req.current_step, comment
                     )
                     messages.error(request, "却下しました。")
@@ -493,7 +542,7 @@ class RequestActionView(LoginRequiredMixin, View):
         return redirect("approvals:detail", pk=pk)
 
     def log_action(self, req, actor, action, step, comment):
-        SimpleApprovalLog.objects.create(
+        ApprovalLog.objects.create(
             request=req,
             actor=actor,
             action=action,
@@ -507,49 +556,39 @@ class RequestWithdrawView(LoginRequiredMixin, View):
     申請取り下げビュー。
     """
     def post(self, request, pk):
-        req = get_object_or_404(SimpleRequest, pk=pk)
+        req = get_object_or_404(Request, pk=pk)
 
-        # 権限チェック：申請者本人のみ
         if req.applicant != request.user:
             messages.error(request, "取り下げ権限がありません。")
             return redirect("approvals:detail", pk=pk)
 
         try:
             with transaction.atomic():
-                req = SimpleRequest.objects.select_for_update().get(pk=pk)
+                req = Request.objects.select_for_update().get(pk=pk)
 
-                # ステータスチェック：Pending, Approved, Remanded
                 if req.status not in [
-                        SimpleRequest.STATUS_PENDING,
-                        SimpleRequest.STATUS_APPROVED,
-                        SimpleRequest.STATUS_REMANDED
+                        Request.STATUS_PENDING,
+                        Request.STATUS_APPROVED,
+                        Request.STATUS_REMANDED
                 ]:
                     messages.error(
                         request, "この申請は取り下げ可能な状態ではありません。"
                     )
                     return redirect("approvals:detail", pk=pk)
 
-                # 差戻しからの取り下げの場合、承認者データを削除し通知もしない
                 is_remanded_withdraw = (
-                    req.status == SimpleRequest.STATUS_REMANDED)
+                    req.status == Request.STATUS_REMANDED)
 
-                req.status = SimpleRequest.STATUS_WITHDRAWN
+                req.status = Request.STATUS_WITHDRAWN
                 req.save()
 
-                if is_remanded_withdraw:
-                    # 承認者リストを物理削除（DB的にも空にする）
-                    # req.approvers.all().delete()
-                    pass
-                else:
-                    # メール通知（現在の承認者＆承認済み承認者）
-                    # 差戻し時以外のみ通知を送る
+                if not is_remanded_withdraw:
                     NotificationService.send_withdrawn(req, request)
 
-                # ログ記録
-                SimpleApprovalLog.objects.create(
+                ApprovalLog.objects.create(
                     request=req,
                     actor=request.user,
-                    action=SimpleApprovalLog.ACTION_WITHDRAW,
+                    action=ApprovalLog.ACTION_WITHDRAW,
                     step=None,
                     comment="申請者による取り下げ"
                 )
@@ -571,7 +610,7 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
         return self.request.user.is_staff
 
     def post(self, request, pk):
-        req = get_object_or_404(SimpleRequest, pk=pk)
+        req = get_object_or_404(Request, pk=pk)
         form = ActionForm(request.POST)
 
         if not form.is_valid():
@@ -585,41 +624,37 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
 
         try:
             with transaction.atomic():
-                req = SimpleRequest.objects.select_for_update().get(pk=pk)
+                req = Request.objects.select_for_update().get(pk=pk)
 
-                # ステータスチェック：Pending または Approved
                 if req.status not in [
-                        SimpleRequest.STATUS_PENDING,
-                        SimpleRequest.STATUS_APPROVED
+                        Request.STATUS_PENDING,
+                        Request.STATUS_APPROVED
                 ]:
                     messages.error(
                         request, "この申請は差戻し可能な状態ではありません。"
                     )
                     return redirect("approvals:detail", pk=pk)
 
-                req.status = SimpleRequest.STATUS_REMANDED
+                req.status = Request.STATUS_REMANDED
                 req.save()
 
-                # 承認者のステータスを変更（現在の承認者を差戻し状態に）
                 if req.current_step:
-                    current = SimpleApprover.objects.filter(
+                    current = Approver.objects.filter(
                         request=req, order=req.current_step
                     ).first()
                     if current:
-                        current.status = SimpleApprover.STATUS_REMANDED
+                        current.status = Approver.STATUS_REMANDED
                         current.processed_at = timezone.now()
                         current.save()
 
-                # ログ記録
-                SimpleApprovalLog.objects.create(
+                ApprovalLog.objects.create(
                     request=req,
                     actor=request.user,
-                    action=SimpleApprovalLog.ACTION_PROXY_REMAND,
+                    action=ApprovalLog.ACTION_PROXY_REMAND,
                     step=req.current_step,
                     comment=comment
                 )
 
-                # メール通知（申請者へ）
                 NotificationService.send_proxy_remanded(
                     req, request.user, comment, request
                 )

@@ -4,9 +4,10 @@ from django.db import models
 from core.models import BaseModel
 
 
-class SimpleRequest(BaseModel):
+class Request(BaseModel):
     """
-    簡易承認申請モデル。
+    申請の基底モデル（マルチテーブル継承の親）。
+    全ての申請タイプに共通するフィールドとロジックを定義する。
     """
     STATUS_DRAFT = 0
     STATUS_PENDING = 1
@@ -38,9 +39,6 @@ class SimpleRequest(BaseModel):
         max_length=100,
         verbose_name="件名"
     )
-    content = models.TextField(
-        verbose_name="内容"
-    )
     status = models.IntegerField(
         choices=STATUS_CHOICES,
         default=STATUS_DRAFT,
@@ -60,13 +58,52 @@ class SimpleRequest(BaseModel):
         verbose_name="閲覧制限フラグ"
     )
 
+    @property
+    def model_verbose_name(self):
+        return self._meta.verbose_name
+
     def __str__(self):
         return f"{self.request_number}: {self.title}"
 
 
-class SimpleApprover(BaseModel):
+class SimpleRequest(Request):
+    """
+    簡易承認申請モデル。
+    """
+    content = models.TextField(
+        verbose_name="内容"
+    )
+
+    class Meta:
+        verbose_name = "簡易承認申請"
+        verbose_name_plural = "簡易承認申請"
+
+
+class LocalBusinessTripRequest(Request):
+    """
+    近距離出張申請モデル。
+    """
+    trip_date = models.DateField(
+        verbose_name="日程"
+    )
+    destination = models.CharField(
+        max_length=100,
+        verbose_name="行先"
+    )
+    note = models.TextField(
+        blank=True,
+        verbose_name="補足事項"
+    )
+
+    class Meta:
+        verbose_name = "近距離出張申請"
+        verbose_name_plural = "近距離出張申請"
+
+
+class Approver(BaseModel):
     """
     承認者設定モデル。
+    Requestモデルに紐づく。
     """
     STATUS_PENDING = 0
     STATUS_APPROVED = 1
@@ -81,7 +118,7 @@ class SimpleApprover(BaseModel):
     ]
 
     request = models.ForeignKey(
-        SimpleRequest,
+        Request,
         on_delete=models.CASCADE,
         related_name="approvers"
     )
@@ -116,9 +153,10 @@ class SimpleApprover(BaseModel):
         return f"{self.request.request_number} - {self.order}: {display_name}"
 
 
-class SimpleApprovalLog(BaseModel):
+class ApprovalLog(BaseModel):
     """
     承認履歴ログモデル。
+    Requestモデルに紐づく。
     """
     ACTION_SUBMIT = 1
     ACTION_APPROVE = 2
@@ -139,7 +177,7 @@ class SimpleApprovalLog(BaseModel):
     ]
 
     request = models.ForeignKey(
-        SimpleRequest,
+        Request,
         on_delete=models.CASCADE,
         related_name="logs"
     )

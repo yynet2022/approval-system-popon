@@ -56,9 +56,28 @@
                         <div class="col-md-10">{{ req.applicant.get_display_name }}</div>
                     </div>
                     <div class="row mb-3">
-                        <div class="col-md-2 text-muted">内容</div>
-                        <div class="col-md-10" style="white-space: pre-wrap;">{{ req.content }}</div>
+                        <div class="col-md-2 text-muted">申請種類</div>
+                        <div class="col-md-10">{{ req.model_verbose_name }}</div>
                     </div>
+                    {% if req.trip_date %}
+                        <div class="row mb-3">
+                            <div class="col-md-2 text-muted">日程</div>
+                            <div class="col-md-10">{{ req.trip_date }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-2 text-muted">行先</div>
+                            <div class="col-md-10">{{ req.destination }}</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-2 text-muted">補足事項</div>
+                            <div class="col-md-10" style="white-space: pre-wrap;">{{ req.note|default:"(なし)" }}</div>
+                        </div>
+                    {% else %}
+                        <div class="row mb-3">
+                            <div class="col-md-2 text-muted">内容</div>
+                            <div class="col-md-10" style="white-space: pre-wrap;">{{ req.content }}</div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 

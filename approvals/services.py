@@ -3,7 +3,8 @@ from django.conf import settings
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.urls import reverse
-from .models import SimpleApprover
+
+from .models import Approver
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ class NotificationService:
 
         # 承認済みの承認者
         approved_approvers = request_obj.approvers.filter(
-            status=SimpleApprover.STATUS_APPROVED
+            status=Approver.STATUS_APPROVED
         )
         for approver in approved_approvers:
             cc_users.add(approver.user)
@@ -170,7 +171,7 @@ class NotificationService:
 
         # 承認済みの承認者
         approved_approvers = request_obj.approvers.filter(
-            status=SimpleApprover.STATUS_APPROVED
+            status=Approver.STATUS_APPROVED
         )
         for approver in approved_approvers:
             cc_users.add(approver.user)
@@ -200,7 +201,7 @@ class NotificationService:
         """
         # To: 現在の承認者
         current_approver_obj = request_obj.approvers.filter(
-            status=SimpleApprover.STATUS_PENDING,
+            status=Approver.STATUS_PENDING,
             order=request_obj.current_step
         ).first()
 
@@ -208,7 +209,7 @@ class NotificationService:
 
         # Cc: 承認済みの承認者
         approved_approvers = request_obj.approvers.filter(
-            status=SimpleApprover.STATUS_APPROVED
+            status=Approver.STATUS_APPROVED
         )
         cc_users = [approver.user for approver in approved_approvers]
 
@@ -246,12 +247,12 @@ class NotificationService:
         """
         # 承認済みの承認者
         approved = request_obj.approvers.filter(
-            status=SimpleApprover.STATUS_APPROVED
+            status=Approver.STATUS_APPROVED
         )
         # 現在の承認者（Pending かつ 現在のステップ）
         #   呼び出し元で Remanded にしている
         current = request_obj.approvers.filter(
-            # status=SimpleApprover.STATUS_PENDING,
+            # status=Approver.STATUS_PENDING,
             order=request_obj.current_step
         )
 

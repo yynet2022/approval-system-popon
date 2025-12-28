@@ -2,12 +2,12 @@ from dal import autocomplete
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models import SimpleApprover, SimpleRequest
+from .models import Approver, LocalBusinessTripRequest, SimpleRequest
 
 
-class RequestForm(forms.ModelForm):
+class SimpleRequestForm(forms.ModelForm):
     """
-    新規申請作成用フォーム。
+    新規申請作成用フォーム（簡易申請用）。
     """
     class Meta:
         model = SimpleRequest
@@ -23,12 +23,34 @@ class RequestForm(forms.ModelForm):
         }
 
 
+class LocalBusinessTripRequestForm(forms.ModelForm):
+    """
+    新規申請作成用フォーム（近距離出張申請用）。
+    """
+    class Meta:
+        model = LocalBusinessTripRequest
+        fields = ("title", "trip_date", "destination", "note", "is_restricted")
+        widgets = {
+            "title": forms.TextInput(attrs={"class": "form-control"}),
+            "trip_date": forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            ),
+            "destination": forms.TextInput(attrs={"class": "form-control"}),
+            "note": forms.Textarea(
+                attrs={"class": "form-control", "rows": 3}
+            ),
+            "is_restricted": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+        }
+
+
 class ApproverForm(forms.ModelForm):
     """
     承認者設定用フォーム（FormSetで使用）。
     """
     class Meta:
-        model = SimpleApprover
+        model = Approver
         fields = ("user", "order")
         widgets = {
             "user": autocomplete.ModelSelect2(
@@ -68,9 +90,12 @@ class ApproverForm(forms.ModelForm):
 
 
 # 承認者設定用フォームセット
+# NOTE: 親モデルがSimpleRequestだが、ApproverはRequestに紐づく。
+# Djangoのinlineformset_factoryは、親モデルのインスタンスをfkとしてセットしようとする。
+# SimpleRequestはRequestを継承しているので、Approver.request (Request型) に代入可能。
 ApproverFormSet = inlineformset_factory(
     SimpleRequest,
-    SimpleApprover,
+    Approver,
     form=ApproverForm,
     extra=2,      # 初期表示数
     max_num=5,    # 最大数
