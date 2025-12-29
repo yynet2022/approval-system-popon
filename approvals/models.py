@@ -58,6 +58,37 @@ class Request(BaseModel):
         verbose_name="閲覧制限フラグ"
     )
 
+    def get_real_instance(self):
+        """
+        自身に関連付けられた子モデルのインスタンスを返す。
+        子モデルが見つからない場合は自分自身(Request)を返す。
+        """
+        # 関連オブジェクト（逆参照）の中から、マルチテーブル継承のリンクを探す
+        for related_object in self._meta.related_objects:
+            if related_object.one_to_one and related_object.parent_link:
+                try:
+                    # 子モデルへのアクセサ（例: simplerequest）を使って取得を試みる
+                    return getattr(self, related_object.get_accessor_name())
+                except related_object.related_model.DoesNotExist:
+                    continue
+        return self
+
+    @property
+    def detail_template_name(self):
+        """
+        詳細表示用のテンプレートパスを返す。
+        デフォルトは 'approvals/partials/detail_{model_name}.html'。
+        """
+        return f"approvals/partials/detail_{self._meta.model_name}.html"
+
+    @property
+    def form_class_name(self):
+        """
+        対応するフォームクラス名を返す。
+        デフォルトは '{ModelName}Form'。
+        """
+        return f"{self._meta.object_name}Form"
+
     @property
     def model_verbose_name(self):
         return self._meta.verbose_name

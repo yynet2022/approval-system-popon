@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
 
+from . import forms
 from .forms import (
     ActionForm,
     ApproverFormSet,
@@ -194,24 +195,15 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
         Requestオブジェクトを取得し、子モデルのインスタンスに変換して返す。
         """
         obj = super().get_object(queryset)
-
-        # 子モデルへのダウンキャスト
-        if hasattr(obj, 'simplerequest'):
-            return obj.simplerequest
-        elif hasattr(obj, 'localbusinesstriprequest'):
-            return obj.localbusinesstriprequest
-        return obj
+        return obj.get_real_instance()
 
     def get_form_class(self):
         """
         オブジェクトの型に応じてフォームクラスを返す。
         """
         obj = self.object
-        if isinstance(obj, SimpleRequest):
-            return SimpleRequestForm
-        elif isinstance(obj, LocalBusinessTripRequest):
-            return LocalBusinessTripRequestForm
-        return SimpleRequestForm  # フォールバック
+        # モデルプロパティからフォームクラス名を動的に取得して解決
+        return getattr(forms, obj.form_class_name, SimpleRequestForm)
 
     def get_queryset(self):
         # 申請者本人のもので、差戻し状態のものに限る
@@ -318,11 +310,7 @@ class RequestDetailView(DetailView):
         表示用に子モデルのインスタンスを取得して返す。
         """
         obj = super().get_object(queryset)
-        if hasattr(obj, 'simplerequest'):
-            return obj.simplerequest
-        elif hasattr(obj, 'localbusinesstriprequest'):
-            return obj.localbusinesstriprequest
-        return obj
+        return obj.get_real_instance()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

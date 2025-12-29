@@ -44,6 +44,8 @@ DEBUG = secrets.get('DEBUG', False)
 
 ALLOWED_HOSTS = secrets.get('ALLOWED_HOSTS', [])
 
+SESSION_COOKIE_NAME = secrets.get('SESSION_COOKIE_NAME', 'popon_sessionid')
+CSRF_COOKIE_NAME = secrets.get('CSRF_COOKIE_NAME', 'popon_csrftoken')
 
 # Application definition
 
