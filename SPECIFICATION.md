@@ -496,82 +496,84 @@ Djangoプロジェクトは「責務分離の原則」に基づき、以下の�
 
 ## **7\. ディレクトリ構成詳細**
 
-project\_root/
-├── manage.py                   \# Django管理コマンド
-├── config/                     \# プロジェクト設定ディレクトリ
-│   ├── \_\_init\_\_.py
+```
+project_root/
+├── manage.py                    # Django管理コマンド
+├── config/                      # プロジェクト設定ディレクトリ
+│   ├── __init__.py
 │   ├── asgi.py
-│   ├── settings.py             \# 設定ファイル (SITE\_ID, PROJECT\_NAME)
-│   ├── urls.py                 \# ルートURL (includeを使用)
+│   ├── settings.py             # 設定ファイル (SITE_ID, PROJECT_NAME)
+│   ├── urls.py                 # ルートURL (includeを使用)
 │   └── wsgi.py
-├── core/                       \# 共通基盤アプリ
-│   ├── \_\_init\_\_.py
+├── core/                        # 共通基盤アプリ
+│   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
-│   ├── context\_processors.py   \# 共通コンテキスト (common)
-│   ├── mixins.py               \# 共通Mixin (View用)
-│   ├── models.py               \# BaseModel 定義
+│   ├── context_processors.py   # 共通コンテキスト (common)
+│   ├── mixins.py               # 共通Mixin (View用)
+│   ├── models.py               # BaseModel 定義
 │   └── tests.py
-├── accounts/                   \# ユーザー管理アプリ
-│   ├── \_\_init\_\_.py
+├── accounts/                    # ユーザー管理アプリ
+│   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
 │   ├── forms.py
-│   ├── models.py               \# User, LoginToken
-│   ├── urls.py                 \# /accounts/ 配下のURL
-│   └── views.py                \# LoginView, VerifyTokenView, ApproverAutocomplete
-├── portal/                     \# ポータルアプリ
-│   ├── \_\_init\_\_.py
+│   ├── models.py               # User, LoginToken
+│   ├── urls.py                 # /accounts/ 配下のURL
+│   └── views.py                # LoginView, VerifyTokenView, ApproverAutocomplete
+├── portal/                      # ポータルアプリ
+│   ├── __init__.py
 │   ├── apps.py
 │   ├── forms.py
 │   ├── urls.py
-│   └── views.py                \# DashboardView (TopPage \+ ListLogic \+ Ajax)
-├── notification/               \# お知らせアプリ
-│   ├── \_\_init\_\_.py
+│   └── views.py                # DashboardView (TopPage + ListLogic + Ajax)
+├── notification/                # お知らせアプリ
+│   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
-│   ├── models.py               \# Notification
+│   ├── models.py               # Notification
 │   ├── urls.py
-│   └── views.py                \# NotificationDetailView
-├── approvals/                  \# 承認機能アプリ
-│   ├── \_\_init\_\_.py
+│   └── views.py                # NotificationDetailView
+├── approvals/                   # 承認機能アプリ
+│   ├── __init__.py
 │   ├── admin.py
 │   ├── apps.py
-│   ├── forms.py                \# SimpleRequestForm, LocalBusinessTripRequestForm, ApproverFormSet
-│   ├── models.py               \# Request, SimpleRequest, LocalBusinessTripRequest, Approver, ApprovalLog
-│   ├── services.py             \# NotificationService (メール通知ロジック)
-│   ├── urls.py                 \# /approvals/ 配下のURL
-│   └── views.py                \# BaseRequestCreateView, SimpleRequestCreateView 等
-├── templates/                  \# テンプレートルート
-│   ├── base.html               \# 共通レイアウト (Navbar, Footer)
+│   ├── forms.py                # SimpleRequestForm, LocalBusinessTripRequestForm, ApproverFormSet
+│   ├── models.py               # Request, SimpleRequest, LocalBusinessTripRequest, Approver, ApprovalLog
+│   ├── services.py             # NotificationService (メール通知ロジック)
+│   ├── urls.py                 # /approvals/ 配下のURL
+│   └── views.py                # BaseRequestCreateView, SimpleRequestCreateView 等
+├── templates/                   # テンプレートルート
+│   ├── base.html               # 共通レイアウト (Navbar, Footer)
 │   ├── accounts/
 │   │   ├── login.html
-│   │   └── login\_sent.html
-│   ├── emails/                 \# メールテンプレート
-│   │   ├── approval\_request.txt
+│   │   └── login_sent.html
+│   ├── emails/                 # メールテンプレート
+│   │   ├── approval_request.txt
 │   │   ├── approved.txt
 │   │   ├── rejected.txt
 │   │   ├── remanded.txt
 │   │   ├── resubmitted.txt
-│   │   ├── proxy\_remanded.txt
+│   │   ├── proxy_remanded.txt
 │   │   └── withdrawn.txt
 │   ├── portal/
-│   │   ├── index.html          \# 検索・フィルタ機能付き一覧を含む
-│   │   └── partials/           \# Ajax用部分テンプレート
-│   │       ├── notification\_list.html
-│   │       └── request\_list.html
+│   │   ├── index.html          # 検索・フィルタ機能付き一覧を含む
+│   │   └── partials/           # Ajax用部分テンプレート
+│   │       ├── notification_list.html
+│   │       └── request_list.html
 │   ├── notification/
 │   │   └── detail.html
 │   └── approvals/
-│       ├── request\_form.html   \# フィールド動的表示対応
-│       └── request\_detail.html \# 申請種別による表示切替対応
-├── static/                     \# 静的ファイルルート
+│       ├── request_form.html   # フィールド動的表示対応
+│       └── request_detail.html # 申請種別による表示切替対応
+├── static/                      # 静的ファイルルート
 │   ├── css/
 │   │   └── style.css
 │   ├── js/
 │   │   └── main.js
 │   └── images/
-└── SPECIFICATION.md            \# 本仕様書
+└── SPECIFICATION.md             # 本仕様書
+```
 
 ## **8\. 用語集**
 
