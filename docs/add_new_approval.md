@@ -1,11 +1,11 @@
 # 新しい申請タイプの追加手順 (Ver 4.1)
 
-本システム（Ver 4.1以降）では、**モデルクラスを定義するだけ**で新しい申請タイプを追加できる「自動構成メカニズム」を導入しました。
+本システム（仕様Ver 4.1以降）では、**モデルクラスを定義するだけ**で新しい申請タイプを追加できる「自動構成メカニズム」を導入しました。
 煩雑なフォーム作成、ビュー定義、URL登録、メニュー編集は一切不要です。
 
 ## 手順概要
 
-1.  **モデル作成**: `approvals/models.py`
+1.  **モデル作成**: `approvals/models/types.py`
 2.  **DB反映**: マイグレーション実行
 3.  **(任意) デザイン調整**: 詳細テンプレート作成
 
@@ -15,11 +15,11 @@
 
 ### Step 1: モデルの作成
 
-`approvals/models.py` に、`Request` を継承したモデルクラスを追加します。
+`approvals/models/types.py` に、`Request` を継承したモデルクラスを追加します。
 設定用のクラス属性 (`request_prefix`, `url_slug`) を記述することで、システムの挙動を制御できます。
 
 ```python
-# approvals/models.py
+# approvals/models/types.py
 
 class PaidLeaveRequest(Request):
     """

@@ -4,7 +4,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.core import mail
 from accounts.models import User
-from .models import Approver, LocalBusinessTripRequest, Request, SimpleRequest
+from .models import Approver, Request
+from .models.types import SimpleRequest, LocalBusinessTripRequest
 import logging
 
 

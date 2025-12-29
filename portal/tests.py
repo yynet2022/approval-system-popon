@@ -2,7 +2,8 @@
 from django.test import TestCase
 from django.urls import reverse
 from accounts.models import User
-from approvals.models import SimpleRequest, Approver, Request
+from approvals.models import Approver, Request
+from approvals.models.types import SimpleRequest
 
 
 class PortalViewTest(TestCase):

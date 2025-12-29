@@ -67,9 +67,18 @@ class Request(BaseModel):
         """
         利用可能な申請タイプ（Requestの具象サブクラス）のリストを返す。
         """
-        # 直接のサブクラスを取得（孫クラスまで考慮する場合は再帰が必要だが、現状はフラットな継承を想定）
-        subclasses = cls.__subclasses__()
-        return [c for c in subclasses if not c._meta.abstract]
+        def get_all_subs(p):
+            for sub in p.__subclasses__():
+                # 孫クラスを再帰的に取得
+                yield from get_all_subs(sub)
+                # 自身が抽象クラスでなければ返す
+                if not sub._meta.abstract:
+                    yield sub
+
+        # setで重複を除去しつつリスト化（多重継承対策）
+        return list(set(get_all_subs(cls)))
+        # subclasses = cls.__subclasses__()
+        # return [c for c in subclasses if not c._meta.abstract]
 
     @classmethod
     def get_by_slug(cls, slug):
@@ -88,7 +97,8 @@ class Request(BaseModel):
         """
         if cls.url_slug:
             return cls.url_slug
-        # デフォルト: モデル名から 'request' を除いた小文字 (SimpleRequest -> simple)
+        # デフォルト:
+        # モデル名から 'request' を除いた小文字 (SimpleRequest -> simple)
         name = cls.__name__.lower()
         if name.endswith("request") and name != "request":
             return name[:-7]
@@ -103,7 +113,8 @@ class Request(BaseModel):
         for related_object in self._meta.related_objects:
             if related_object.one_to_one and related_object.parent_link:
                 try:
-                    # 子モデルへのアクセサ（例: simplerequest）を使って取得を試みる
+                    # 子モデルへのアクセサ
+                    # （例: simplerequest）を使って取得を試みる
                     return getattr(self, related_object.get_accessor_name())
                 except related_object.related_model.DoesNotExist:
                     continue
@@ -111,16 +122,19 @@ class Request(BaseModel):
 
     def get_extra_fields(self):
         """
-        詳細表示用に、Requestモデル固有のフィールドを除いたフィールド情報のリストを返す。
+        詳細表示用に、Requestモデル固有のフィールドを除いた
+        フィールド情報のリストを返す。
         （デフォルトテンプレートで使用）
         """
         data = []
         # 親モデル(Request)のフィールド名セット
-        # 注意: selfがRequestインスタンスの場合もあるが、通常はサブクラスのインスタンスで呼ばれる
+        # 注意: selfがRequestインスタンスの場合もあるが、
+        #       通常はサブクラスのインスタンスで呼ばれる
         parent_field_names = {f.name for f in Request._meta.fields}
 
         for field in self._meta.fields:
-            # 親モデルにあるフィールドはスキップ（件名などは共通表示エリアに出るため）
+            # 親モデルにあるフィールドはスキップ
+            # （件名などは共通表示エリアに出るため）
             if field.name in parent_field_names:
                 continue
 
@@ -162,46 +176,6 @@ class Request(BaseModel):
 
     def __str__(self):
         return f"{self.request_number}: {self.title}"
-
-
-class SimpleRequest(Request):
-    """
-    簡易承認申請モデル。
-    """
-    request_prefix = "REQ-S"
-    url_slug = "simple"
-
-    content = models.TextField(
-        verbose_name="内容"
-    )
-
-    class Meta:
-        verbose_name = "簡易承認申請"
-        verbose_name_plural = "簡易承認申請"
-
-
-class LocalBusinessTripRequest(Request):
-    """
-    近距離出張申請モデル。
-    """
-    request_prefix = "REQ-L"
-    url_slug = "trip"
-
-    trip_date = models.DateField(
-        verbose_name="日程"
-    )
-    destination = models.CharField(
-        max_length=100,
-        verbose_name="行先"
-    )
-    note = models.TextField(
-        blank=True,
-        verbose_name="補足事項"
-    )
-
-    class Meta:
-        verbose_name = "近距離出張申請"
-        verbose_name_plural = "近距離出張申請"
 
 
 class Approver(BaseModel):

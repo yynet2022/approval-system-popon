@@ -2,7 +2,7 @@ from dal import autocomplete
 from django import forms
 from django.contrib.auth import get_user_model
 
-from approvals.models import SimpleRequest
+from approvals.models import Request
 
 User = get_user_model()
 
@@ -24,7 +24,7 @@ class SearchForm(forms.Form):
     status = forms.ChoiceField(
         label="ステータス",
         required=False,
-        choices=[("", "全て")] + SimpleRequest.STATUS_CHOICES,
+        choices=[("", "全て")] + Request.STATUS_CHOICES,
         widget=forms.Select(attrs={"class": "form-select"})
     )
     applicant = forms.ModelChoiceField(
