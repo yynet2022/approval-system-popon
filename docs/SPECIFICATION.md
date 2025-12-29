@@ -1,4 +1,4 @@
-# **承認システム プログラム仕様書 ver4.0**
+# **承認システム プログラム仕様書 ver4.1**
 
 ## **1\. 概要**
 
@@ -572,7 +572,9 @@ project_root/
 │   ├── js/
 │   │   └── main.js
 │   └── images/
-└── SPECIFICATION.md             # 本仕様書
+└── docs/
+     ├── SPECIFICATION.md             # 本仕様書
+     └── add_new_approval.md          # 申請タイプの追加手順書
 ```
 
 ## **8\. 用語集**
