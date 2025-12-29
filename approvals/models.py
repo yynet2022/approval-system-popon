@@ -58,6 +58,42 @@ class Request(BaseModel):
         verbose_name="閲覧制限フラグ"
     )
 
+    # クラスごとの設定（サブクラスでオーバーライド）
+    request_prefix = "REQ"
+    url_slug = None  # URLで使用する識別子（例: 'simple'）。未設定の場合はクラス名小文字になる
+
+    @classmethod
+    def get_request_types(cls):
+        """
+        利用可能な申請タイプ（Requestの具象サブクラス）のリストを返す。
+        """
+        # 直接のサブクラスを取得（孫クラスまで考慮する場合は再帰が必要だが、現状はフラットな継承を想定）
+        subclasses = cls.__subclasses__()
+        return [c for c in subclasses if not c._meta.abstract]
+
+    @classmethod
+    def get_by_slug(cls, slug):
+        """
+        スラッグから対応するモデルクラスを返す。
+        """
+        for subclass in cls.get_request_types():
+            if subclass.get_slug() == slug:
+                return subclass
+        return None
+
+    @classmethod
+    def get_slug(cls):
+        """
+        このモデルのURLスラッグを返す。
+        """
+        if cls.url_slug:
+            return cls.url_slug
+        # デフォルト: モデル名から 'request' を除いた小文字 (SimpleRequest -> simple)
+        name = cls.__name__.lower()
+        if name.endswith("request") and name != "request":
+            return name[:-7]
+        return name
+
     def get_real_instance(self):
         """
         自身に関連付けられた子モデルのインスタンスを返す。
@@ -72,6 +108,37 @@ class Request(BaseModel):
                 except related_object.related_model.DoesNotExist:
                     continue
         return self
+
+    def get_extra_fields(self):
+        """
+        詳細表示用に、Requestモデル固有のフィールドを除いたフィールド情報のリストを返す。
+        （デフォルトテンプレートで使用）
+        """
+        data = []
+        # 親モデル(Request)のフィールド名セット
+        # 注意: selfがRequestインスタンスの場合もあるが、通常はサブクラスのインスタンスで呼ばれる
+        parent_field_names = {f.name for f in Request._meta.fields}
+
+        for field in self._meta.fields:
+            # 親モデルにあるフィールドはスキップ（件名などは共通表示エリアに出るため）
+            if field.name in parent_field_names:
+                continue
+
+            # IDや内部的なフィールドもスキップ
+            if field.name == "id":
+                continue
+
+            value = getattr(self, field.name)
+
+            # 表示用の値を調整
+            if hasattr(self, f"get_{field.name}_display"):
+                value = getattr(self, f"get_{field.name}_display")()
+
+            data.append({
+                "label": field.verbose_name,
+                "value": value
+            })
+        return data
 
     @property
     def detail_template_name(self):
@@ -101,6 +168,9 @@ class SimpleRequest(Request):
     """
     簡易承認申請モデル。
     """
+    request_prefix = "REQ-S"
+    url_slug = "simple"
+
     content = models.TextField(
         verbose_name="内容"
     )
@@ -114,6 +184,9 @@ class LocalBusinessTripRequest(Request):
     """
     近距離出張申請モデル。
     """
+    request_prefix = "REQ-L"
+    url_slug = "trip"
+
     trip_date = models.DateField(
         verbose_name="日程"
     )

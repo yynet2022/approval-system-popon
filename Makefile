@@ -1,16 +1,17 @@
 #
-SITE_NAME=SITE_NAME      ## e.g., YYNET
-SITE_DOMAIN=SITE_DOMAIN  ## e.g., localhost:8000
+SITE_NAME=SITE_NAME ## e.g., YYNET
+SITE_DOMAIN=SITE_DOMAIN ## e.g., localhost:8000
 EMAIL=EMAIL              ## e.g., webmaster@example.com
 
 all:
 	python manage.py makemigrations --no-color 
 	python manage.py migrate --no-color
-
-init: all
+	@echo
 	@echo e.g.
+	@echo "# python contrib/generate_secretkey.py >>config/.secrets.toml"
 	@echo "# python manage.py update_site --name ${SITE_NAME} --domain ${SITE_DOMAIN}"
 	@echo "# python manage.py createsuperuser --no-input --email ${EMAIL}"
+	@echo "# python manage.py setup_test_data --no-color"
 
 check:
 	for i in accounts approvals config core notification portal; do flake8 --exclude migrations $$i/ || true; done

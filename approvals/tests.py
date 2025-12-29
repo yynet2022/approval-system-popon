@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.core import mail
 from accounts.models import User
 from .models import Approver, LocalBusinessTripRequest, Request, SimpleRequest
+import logging
 
 
 class ApprovalWorkflowTest(TestCase):
@@ -32,7 +33,7 @@ class ApprovalWorkflowTest(TestCase):
     def test_create_trip_request(self):
         """近距離出張申請の作成テスト"""
         self.client.force_login(self.applicant)
-        url = reverse("approvals:create_trip")
+        url = reverse("approvals:create", kwargs={"request_type": "trip"})
         data = {
             "title": "大阪出張",
             "trip_date": "2025-12-30",
@@ -54,7 +55,7 @@ class ApprovalWorkflowTest(TestCase):
     def test_create_request_validation(self):
         """申請作成時のバリデーションテスト"""
         self.client.force_login(self.applicant)
-        url = reverse("approvals:create_simple")
+        url = reverse("approvals:create", kwargs={"request_type": "simple"})
 
         # ケース1: 承認者が自分自身
         data_self = {
@@ -85,7 +86,7 @@ class ApprovalWorkflowTest(TestCase):
     def test_create_request_success_and_mail(self):
         """申請作成成功とメール件名確認"""
         self.client.force_login(self.applicant)
-        url = reverse("approvals:create_simple")
+        url = reverse("approvals:create", kwargs={"request_type": "simple"})
         data = {
             "title": "メール確認用", "content": "内容は問わない",
             "approvers-TOTAL_FORMS": "1", "approvers-INITIAL_FORMS": "0",
@@ -168,9 +169,14 @@ class ApprovalWorkflowTest(TestCase):
 
         url = reverse("approvals:proxy-remand", kwargs={"pk": req.id})
 
+        # 一時的に黙らせる。PermissionDenied はウザい
+        logger = logging.getLogger('django.request')
+        previous_level = logger.getEffectiveLevel()
+        logger.setLevel(logging.CRITICAL)
         # 一般ユーザー（approver1）ではアクセス不可
         self.client.force_login(self.approver1)
         response = self.client.post(url, {"comment": "強制"})
+        logger.setLevel(previous_level)
         self.assertEqual(response.status_code, 403)  # Forbidden
 
         # 管理者ならOK

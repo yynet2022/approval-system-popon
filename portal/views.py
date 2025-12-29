@@ -117,4 +117,14 @@ class DashboardView(TemplateView):
                 status=Request.STATUS_REMANDED
             ).order_by("-updated_at")
 
+        # 4. 利用可能な申請タイプ一覧 (メニュー用)
+        # テンプレートからはクラス属性(_meta)にアクセスできないため辞書化して渡す
+        available_types = []
+        for cls in Request.get_request_types():
+            available_types.append({
+                "slug": cls.get_slug(),
+                "name": cls._meta.verbose_name,
+            })
+        context["available_request_types"] = available_types
+
         return context

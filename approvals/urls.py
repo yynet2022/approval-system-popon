@@ -5,20 +5,16 @@ from . import views
 app_name = "approvals"
 
 urlpatterns = [
-    # 申請作成 (タイプ別)
+    # 汎用申請作成 (タイプ別)
+    # create/simple/ -> request_type="simple"
+    # create/trip/   -> request_type="trip"
     path(
-        "create/simple/",
-        views.SimpleRequestCreateView.as_view(),
-        name="create_simple"
-    ),
-    path(
-        "create/trip/",
-        views.LocalBusinessTripRequestCreateView.as_view(),
-        name="create_trip"
+        "create/<str:request_type>/",
+        views.RequestCreateView.as_view(),
+        name="create"
     ),
 
-    # 共通処理 (詳細、アクション、更新、取り下げ、代理差戻し)
-    # ※Requestモデルベースで動作する
+    # 共通処理
     path("<uuid:pk>/", views.RequestDetailView.as_view(), name="detail"),
     path(
         "<uuid:pk>/action/",

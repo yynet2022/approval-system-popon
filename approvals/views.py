@@ -2,25 +2,24 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
+from django.template.loader import get_template
+from django.template import TemplateDoesNotExist
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
 
-from . import forms
 from .forms import (
     ActionForm,
     ApproverFormSet,
-    LocalBusinessTripRequestForm,
-    SimpleRequestForm,
+    create_request_form_class,
 )
 from .models import (
     ApprovalLog,
     Approver,
-    LocalBusinessTripRequest,
     Request,
-    SimpleRequest,
 )
 from .services import NotificationService
 
@@ -72,7 +71,7 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
     """
     template_name = "approvals/request_form.html"
     success_url = reverse_lazy("portal:index")
-    request_prefix = "REQ"  # サブクラスでオーバーライドする
+    # request_prefix はサブクラスまたはインスタンスプロパティで定義
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -80,6 +79,11 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
             context["approver_formset"] = ApproverFormSet(self.request.POST)
         else:
             context["approver_formset"] = ApproverFormSet()
+
+        # 画面表示用にモデルの日本語名などを渡す
+        if hasattr(self, "model_class"):
+            context["page_title"] = f"{self.model_class._meta.verbose_name} 作成"
+
         return context
 
     def generate_request_number(self):
@@ -89,11 +93,12 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
         """
         now = timezone.now()
         yyyymm = now.strftime("%Y%m")
-        prefix = f"{self.request_prefix}-{yyyymm}"
+
+        # prefixの取得
+        prefix_val = getattr(self, "request_prefix", "REQ")
+        prefix = f"{prefix_val}-{yyyymm}"
 
         # その月の最新の申請番号を取得してロック
-        # NOTE: Request全体で連番を共有するか、Prefixごとに分けるか。
-        # ここではPrefixごとに連番を振るロジックにする。
         qs = Request.objects.select_for_update()
         latest_request = qs.filter(
             request_number__startswith=prefix
@@ -167,24 +172,36 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
             return self.render_to_response(context)
 
 
-class SimpleRequestCreateView(BaseRequestCreateView):
-    """簡易申請作成ビュー"""
-    model = SimpleRequest
-    form_class = SimpleRequestForm
-    request_prefix = "REQ-S"
+class RequestCreateView(BaseRequestCreateView):
+    """
+    汎用的な申請作成ビュー。
+    URLパラメータ `request_type` に基づいてモデルとフォームを決定する。
+    """
 
+    def dispatch(self, request, *args, **kwargs):
+        # URLパラメータからスラッグを取得
+        slug = kwargs.get("request_type")
+        # モデルクラスを特定
+        self.model_class = Request.get_by_slug(slug)
 
-class LocalBusinessTripRequestCreateView(BaseRequestCreateView):
-    """近距離出張申請作成ビュー"""
-    model = LocalBusinessTripRequest
-    form_class = LocalBusinessTripRequestForm
-    request_prefix = "REQ-L"
+        if not self.model_class:
+            raise Http404(f"申請タイプ '{slug}' は存在しません。")
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_class(self):
+        # 動的にフォームクラスを生成
+        return create_request_form_class(self.model_class)
+
+    @property
+    def request_prefix(self):
+        # モデルクラスに定義された prefix を使用
+        return getattr(self.model_class, "request_prefix", "REQ")
 
 
 class RequestUpdateView(LoginRequiredMixin, UpdateView):
     """
     再申請ビュー。
-    申請タイプに応じてフォームを切り替える。
     """
     model = Request
     template_name = "approvals/request_form.html"
@@ -199,11 +216,9 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_form_class(self):
         """
-        オブジェクトの型に応じてフォームクラスを返す。
+        オブジェクトの型に応じてフォームクラスを動的に生成して返す。
         """
-        obj = self.object
-        # モデルプロパティからフォームクラス名を動的に取得して解決
-        return getattr(forms, obj.form_class_name, SimpleRequestForm)
+        return create_request_form_class(self.object.__class__)
 
     def get_queryset(self):
         # 申請者本人のもので、差戻し状態のものに限る
@@ -220,6 +235,8 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
             )
         else:
             context["approver_formset"] = ApproverFormSet(instance=self.object)
+
+        context["page_title"] = f"{self.object._meta.verbose_name} 再申請"
         return context
 
     def form_valid(self, form):
@@ -248,7 +265,10 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
                 )
 
                 # 申請情報の更新
+                # formは子モデルのフォームなので、そのままsaveすれば子モデルが更新される
                 updated_object = form.save(commit=False)
+
+                # 親モデル(Request)のフィールドも更新
                 updated_object.status = Request.STATUS_PENDING
                 updated_object.current_step = 1
                 updated_object.submitted_at = timezone.now()
@@ -316,6 +336,16 @@ class RequestDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         req = self.object
         user = self.request.user
+
+        # テンプレートの存在確認とフォールバック
+        template_name = req.detail_template_name
+        try:
+            get_template(template_name)
+            context["partial_template"] = template_name
+        except TemplateDoesNotExist:
+            context["partial_template"] = (
+                "approvals/partials/detail_default.html"
+            )
 
         # 現在のユーザーが承認すべき状態か判定
         can_approve = False

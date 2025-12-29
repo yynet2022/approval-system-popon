@@ -1,48 +1,70 @@
 from dal import autocomplete
 from django import forms
-from django.forms import inlineformset_factory
+from django.db import models
+from django.forms import inlineformset_factory, modelform_factory
 
-from .models import Approver, LocalBusinessTripRequest, SimpleRequest
+from .models import Approver, Request
 
 
-class SimpleRequestForm(forms.ModelForm):
+def create_request_form_class(model_class):
     """
-    新規申請作成用フォーム（簡易申請用）。
+    指定された申請モデルクラスに対応するModelFormクラスを動的に生成する。
+    Bootstrap5用のクラスや、適切なウィジェットを自動適用する。
     """
-    class Meta:
-        model = SimpleRequest
-        fields = ("title", "content", "is_restricted")
-        widgets = {
-            "title": forms.TextInput(attrs={"class": "form-control"}),
-            "content": forms.Textarea(
+
+    # 除外するフィールド（システム自動設定）
+    exclude_fields = [
+        "id",
+        "request_number",
+        "applicant",
+        "status",
+        "current_step",
+        "submitted_at",
+        "created_at",
+        "updated_at",
+    ]
+
+    # デフォルトのウィジェット設定
+    widgets = {
+        "title": forms.TextInput(attrs={"class": "form-control"}),
+        "is_restricted": forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        ),
+    }
+
+    # モデルのフィールドを走査してウィジェットを決定
+    for field in model_class._meta.fields:
+        if field.name in exclude_fields:
+            continue
+
+        # 既に定義済みの場合はスキップ
+        if field.name in widgets:
+            continue
+
+        if isinstance(field, models.TextField):
+            widgets[field.name] = forms.Textarea(
                 attrs={"class": "form-control", "rows": 5}
-            ),
-            "is_restricted": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
-        }
-
-
-class LocalBusinessTripRequestForm(forms.ModelForm):
-    """
-    新規申請作成用フォーム（近距離出張申請用）。
-    """
-    class Meta:
-        model = LocalBusinessTripRequest
-        fields = ("title", "trip_date", "destination", "note", "is_restricted")
-        widgets = {
-            "title": forms.TextInput(attrs={"class": "form-control"}),
-            "trip_date": forms.DateInput(
+            )
+        elif isinstance(field, models.DateField):
+            widgets[field.name] = forms.DateInput(
                 attrs={"class": "form-control", "type": "date"}
-            ),
-            "destination": forms.TextInput(attrs={"class": "form-control"}),
-            "note": forms.Textarea(
-                attrs={"class": "form-control", "rows": 3}
-            ),
-            "is_restricted": forms.CheckboxInput(
+            )
+        elif isinstance(field, models.BooleanField):
+            widgets[field.name] = forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
-            ),
-        }
+            )
+        else:
+            # デフォルトはform-control適用
+            widgets[field.name] = forms.TextInput(
+                attrs={"class": "form-control"}
+            )
+
+    # フォームクラス生成
+    return modelform_factory(
+        model_class,
+        exclude=exclude_fields,
+        widgets=widgets
+    )
 
 
 class ApproverForm(forms.ModelForm):
@@ -90,11 +112,8 @@ class ApproverForm(forms.ModelForm):
 
 
 # 承認者設定用フォームセット
-# NOTE: 親モデルがSimpleRequestだが、ApproverはRequestに紐づく。
-# Djangoのinlineformset_factoryは、親モデルのインスタンスをfkとしてセットしようとする。
-# SimpleRequestはRequestを継承しているので、Approver.request (Request型) に代入可能。
 ApproverFormSet = inlineformset_factory(
-    SimpleRequest,
+    Request,  # 汎用的にRequestを親とする
     Approver,
     form=ApproverForm,
     extra=2,      # 初期表示数

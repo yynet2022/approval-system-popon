@@ -13,8 +13,13 @@
                 新規申請
               </button>
               <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="{% url 'approvals:create_simple' %}">簡易申請</a></li>
-                <li><a class="dropdown-item" href="{% url 'approvals:create_trip' %}">近距離出張申請</a></li>
+                {% for req_type in available_request_types %}
+                    <li>
+                        <a class="dropdown-item" href="{% url 'approvals:create' req_type.slug %}">
+                            {{ req_type.name }}
+                        </a>
+                    </li>
+                {% endfor %}
               </ul>
             </div>
         {% endif %}

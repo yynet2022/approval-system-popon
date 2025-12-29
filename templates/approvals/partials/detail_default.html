@@ -1,0 +1,12 @@
+{% comment %}
+デフォルトの詳細表示テンプレート
+Requestモデルの get_extra_fields メソッドを使用して、
+モデル固有のフィールドを自動的に表示します。
+{% endcomment %}
+
+{% for item in req.get_extra_fields %}
+<div class="row mb-3">
+    <div class="col-md-2 text-muted">{{ item.label }}</div>
+    <div class="col-md-10" style="white-space: pre-wrap;">{{ item.value|default:"-" }}</div>
+</div>
+{% endfor %}
