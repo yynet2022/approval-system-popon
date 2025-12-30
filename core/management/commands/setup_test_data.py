@@ -36,6 +36,9 @@ class Command(BaseCommand):
         # 4. 申請データ作成 (近距離出張申請)
         self.create_trip_requests()
 
+        # 5. 大量データ作成 (ページネーション確認用)
+        self.create_bulk_requests()
+
         self.stdout.write(self.style.SUCCESS("--- テストデータ作成完了 ---"))
 
     def create_users(self):
@@ -99,49 +102,54 @@ class Command(BaseCommand):
 
     def create_notifications(self):
         """お知らせ作成"""
+        # 今日 (2025-12-30) を基準にする
+        base_date = timezone.make_aware(datetime(2025, 12, 30))
+
         notices = [
             {
                 "title": "あけましておめでとうございます",
                 "content": "本年もよろしくお願いします。",
-                "days_ago": 0
+                "days_ago": -1  # 未来 (12/31)
             },
             {
                 "title": "システムメンテナンスのお知らせ",
                 "content": "12月31日の23:00からメンテナンスを行います。",
-                "days_ago": 5
+                "days_ago": 1
             },
             {
                 "title": "年末年始の営業について",
                 "content": "12月29日から1月3日まで休業となります。",
-                "days_ago": 7
+                "days_ago": 2
             },
             {
                 "title": "近距離出張申請",
                 "content": "本日より近距離出張申請が可能になりました。",
-                "days_ago": 8
+                "days_ago": 3
             },
             {
                 "title": "差戻し機能",
                 "content": "差し戻された申請は取り下げるか再申請が可能です。",
-                "days_ago": 8
+                "days_ago": 4
             },
             {
                 "title": "承認者について",
                 "content": "デフォルトは2人ですが、5人まで増やせます。",
-                "days_ago": 9
+                "days_ago": 5
             },
             {
                 "title": "ポポン運用開始",
                 "content": "本日より新承認システム「ポポン」が稼働しました。",
-                "days_ago": 10
+                "days_ago": 6
+            },
+            {
+                "title": "旧システムのデータ移行について",
+                "content": "旧システムのデータは1月末まで閲覧可能です。",
+                "days_ago": 7
             }
         ]
 
-        # Notification.objects.all().delete()
         for notice in notices:
-            # pub_date = timezone.now() - timedelta(days=notice["days_ago"])
-            pub_date = (timezone.make_aware(datetime(2026, 1, 1)) -
-                        timedelta(days=notice["days_ago"]))
+            pub_date = base_date - timedelta(days=notice["days_ago"])
             n, created = Notification.objects.update_or_create(
                 title=notice["title"],
                 defaults={
@@ -248,6 +256,24 @@ class Command(BaseCommand):
             Request.STATUS_WITHDRAWN, 1,
             [(leader, 0)]
         )
+
+    def create_bulk_requests(self):
+        """大量のダミー申請データを作成（ページネーション確認用）"""
+        sato_j = User.objects.get(email="sato@example.com")
+        yamada = User.objects.get(email="yamada@example.com")
+        leader = User.objects.get(email="leader@example.com")
+        kacho = User.objects.get(email="kacho@example.com")
+
+        self.stdout.write("大量申請データ作成中...")
+        for i in range(1, 26):
+            applicant = yamada if i % 2 == 0 else sato_j
+            num = f"REQ-BULK-{i:04d}"
+            self.make_simple(
+                num, applicant, f"大量テスト申請 {i}",
+                f"これはページネーションテスト用のダミーデータ第 {i} 号です。",
+                Request.STATUS_APPROVED, 2,
+                [(leader, 1, "OK"), (kacho, 1, "承認")]
+            )
 
     def make_simple(self, num, applicant, title, content,
                     status, step, route, is_restricted=False):
