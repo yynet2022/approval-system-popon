@@ -48,3 +48,14 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const emailInput = document.getElementById("{{ form.email.id_for_label }}");
+        if (emailInput) {
+            emailInput.focus();
+        }
+    });
+</script>
+{% endblock %}

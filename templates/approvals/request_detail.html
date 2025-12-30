@@ -178,7 +178,7 @@
                             管理者権限で強制的に申請を「差戻し」状態に変更します。<br>
                             現在の承認ステップは中断され、申請者に差し戻されます。
                         </p>
-                        <form action="{% url 'approvals:proxy-remand' req.id %}" method="post">
+                        <form action="{% url 'approvals:proxy-remand' req.id %}" method="post" onsubmit="return confirm('強制的に差戻しますか？');">
                             {% csrf_token %}
                             <div class="mb-3">
                                 <label for="proxy_comment" class="form-label">
@@ -186,7 +186,7 @@
                                 </label>
                                 <textarea name="comment" id="proxy_comment" class="form-control" rows="2" required></textarea>
                             </div>
-                            <button type="submit" class="btn btn-warning w-100" onsubmit="return confirm('強制的に差戻しますか？');">
+                            <button type="submit" class="btn btn-warning w-100">
                                 代理差戻しを実行
                             </button>
                         </form>
