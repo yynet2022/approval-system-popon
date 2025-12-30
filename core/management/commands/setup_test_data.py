@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
@@ -7,9 +7,11 @@ from django.utils import timezone
 from approvals.models import (
     ApprovalLog,
     Approver,
-    LocalBusinessTripRequest,
     Request,
+)
+from approvals.models.types import (
     SimpleRequest,
+    LocalBusinessTripRequest,
 )
 from notification.models import Notification
 
@@ -37,7 +39,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("--- テストデータ作成完了 ---"))
 
     def create_users(self):
-        """ユーザー定義と作成（a.pyの内容を完全復元）"""
+        """ユーザー定義と作成"""
         users_data = [
             # 管理者
             {
@@ -76,12 +78,12 @@ class Command(BaseCommand):
 
             if data["role"] == "admin":
                 user.is_staff = True
-                user.is_superuser = True
+                # user.is_superuser = True
                 if created:
-                    user.set_password("admin")
+                    user.set_password("adminxxx")
 
             user.is_approver = (
-                data["role"] == "approver" or data["role"] == "admin"
+                data["role"] == "approver"  # or data["role"] == "admin"
             )
             user.save()
 
@@ -96,28 +98,51 @@ class Command(BaseCommand):
                 )
 
     def create_notifications(self):
-        """お知らせ作成（a.pyの内容を復元）"""
+        """お知らせ作成"""
         notices = [
+            {
+                "title": "あけましておめでとうございます",
+                "content": "本年もよろしくお願いします。",
+                "days_ago": 0
+            },
             {
                 "title": "システムメンテナンスのお知らせ",
                 "content": "12月31日の23:00からメンテナンスを行います。",
-                "days_ago": 0
+                "days_ago": 5
             },
             {
                 "title": "年末年始の営業について",
                 "content": "12月29日から1月3日まで休業となります。",
-                "days_ago": 2
+                "days_ago": 7
+            },
+            {
+                "title": "近距離出張申請",
+                "content": "本日より近距離出張申請が可能になりました。",
+                "days_ago": 8
+            },
+            {
+                "title": "差戻し機能",
+                "content": "差し戻された申請は取り下げるか再申請が可能です。",
+                "days_ago": 8
+            },
+            {
+                "title": "承認者について",
+                "content": "デフォルトは2人ですが、5人まで増やせます。",
+                "days_ago": 9
             },
             {
                 "title": "ポポン運用開始",
                 "content": "本日より新承認システム「ポポン」が稼働しました。",
-                "days_ago": 5
+                "days_ago": 10
             }
         ]
 
+        # Notification.objects.all().delete()
         for notice in notices:
-            pub_date = timezone.now() - timedelta(days=notice["days_ago"])
-            n, created = Notification.objects.get_or_create(
+            # pub_date = timezone.now() - timedelta(days=notice["days_ago"])
+            pub_date = (timezone.make_aware(datetime(2026, 1, 1)) -
+                        timedelta(days=notice["days_ago"]))
+            n, created = Notification.objects.update_or_create(
                 title=notice["title"],
                 defaults={
                     "content": notice["content"],
@@ -128,13 +153,13 @@ class Command(BaseCommand):
                 self.stdout.write(f"お知らせ作成: {n.title}")
 
     def create_simple_requests(self):
-        """簡易申請のバリエーション（a.pyの復元 ＋ 追加ステータス）"""
+        """簡易申請のバリエーション"""
         yamada = User.objects.get(email="yamada@example.com")
         leader = User.objects.get(email="leader@example.com")
         kacho = User.objects.get(email="kacho@example.com")
         bucho = User.objects.get(email="bucho@example.com")
 
-        # 1. 申請中（リーダー承認待ち） - a.py復元
+        # 1. 申請中（リーダー承認待ち）
         self.make_simple(
             "REQ-S-TEST-0001", yamada, "PC購入申請",
             "スペック不足のため買い替えをお願いします。",
@@ -142,7 +167,7 @@ class Command(BaseCommand):
             [(leader, 0), (kacho, 0)]
         )
 
-        # 2. 申請中（課長承認待ち / リーダー承認済み） - a.py復元
+        # 2. 申請中（課長承認待ち / リーダー承認済み）
         self.make_simple(
             "REQ-S-TEST-0002", yamada, "出張旅費精算",
             "大阪出張の交通費です。",
@@ -150,14 +175,14 @@ class Command(BaseCommand):
             [(leader, 1, "OKです"), (kacho, 0)]
         )
 
-        # 3. 承認完了 - a.py復元
+        # 3. 承認完了
         self.make_simple(
             "REQ-S-TEST-0003", yamada, "備品購入", "マウスが壊れました。",
             Request.STATUS_APPROVED, 2,
             [(leader, 1, "どうぞ")]
         )
 
-        # 4. 閲覧制限付き（部長決裁のみ） - a.py復元
+        # 4. 閲覧制限付き（部長決裁のみ）
         self.make_simple(
             "REQ-S-TEST-0004", yamada, "人事に関する相談", "極秘事項です。",
             Request.STATUS_PENDING, 1,
