@@ -1,0 +1,4 @@
+Django==4.2.27
+django-autocomplete-light==3.12.1
+flake8==7.3.0
+tomli==2.3.0

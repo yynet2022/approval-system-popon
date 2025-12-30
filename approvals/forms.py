@@ -53,6 +53,10 @@ def create_request_form_class(model_class):
             widgets[field.name] = forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
             )
+        elif field.choices:
+            widgets[field.name] = forms.Select(
+                attrs={"class": "form-select"}
+            )
         else:
             # デフォルトはform-control適用
             widgets[field.name] = forms.TextInput(
