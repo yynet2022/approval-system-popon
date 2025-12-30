@@ -27,15 +27,32 @@ class PaidLeaveRequest(Request):
     """
     # 【必須】申請番号のプレフィックス
     request_prefix = "REQ-P"
-    
+
     # 【任意】URL識別子（省略時はクラス名から自動生成: paidleaverequest -> paidleave）
     url_slug = "paid-leave"
+
+    PTYPE_ALL = 0
+    PTYPE_AM = 1
+    PTYPE_PM = 2
+    PTYPE_TIME = 3
+    PTYPE_CHOICES = [
+        (PTYPE_ALL, "終日"),
+        (PTYPE_AM, "午前休"),
+        (PTYPE_PM, "午後休"),
+        (PTYPE_TIME, "時間休"),
+    ]
 
     # 独自のフィールド定義
     leave_date = models.DateField(
         verbose_name="休暇取得日"
     )
+    ptype = models.IntegerField(
+        choices=PTYPE_CHOICES,
+        default=PTYPE_ALL,
+        verbose_name="タイプ"
+    )
     reason = models.TextField(
+        blank=True,
         verbose_name="取得理由"
     )
 

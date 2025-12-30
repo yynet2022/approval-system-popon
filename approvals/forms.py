@@ -41,24 +41,51 @@ def create_request_form_class(model_class):
         if field.name in widgets:
             continue
 
-        if isinstance(field, models.TextField):
-            widgets[field.name] = forms.Textarea(
-                attrs={"class": "form-control", "rows": 5}
+        # 1. 選択肢があるフィールド、または外部キー -> Select
+        if field.choices or isinstance(field, models.ForeignKey):
+            widgets[field.name] = forms.Select(
+                attrs={"class": "form-select"}
             )
-        elif isinstance(field, models.DateField):
-            widgets[field.name] = forms.DateInput(
-                attrs={"class": "form-control", "type": "date"}
-            )
+        # 2. ブール値 -> Checkbox
         elif isinstance(field, models.BooleanField):
             widgets[field.name] = forms.CheckboxInput(
                 attrs={"class": "form-check-input"}
             )
-        elif field.choices:
-            widgets[field.name] = forms.Select(
-                attrs={"class": "form-select"}
+        # 3. テキストエリア
+        elif isinstance(field, models.TextField):
+            widgets[field.name] = forms.Textarea(
+                attrs={"class": "form-control", "rows": 5}
             )
+        # 4. 日付
+        elif isinstance(field, models.DateField):
+            widgets[field.name] = forms.DateInput(
+                attrs={"class": "form-control", "type": "date"}
+            )
+        # 5. 日時
+        elif isinstance(field, models.DateTimeField):
+            widgets[field.name] = forms.DateTimeInput(
+                attrs={"class": "form-control", "type": "datetime-local"}
+            )
+        # 6. 数値
+        elif isinstance(
+            field,
+            (models.IntegerField, models.DecimalField, models.FloatField)
+        ):
+            widgets[field.name] = forms.NumberInput(
+                attrs={"class": "form-control"}
+            )
+        # 7. メールアドレス
+        elif isinstance(field, models.EmailField):
+            widgets[field.name] = forms.EmailInput(
+                attrs={"class": "form-control"}
+            )
+        # 8. URL
+        elif isinstance(field, models.URLField):
+            widgets[field.name] = forms.URLInput(
+                attrs={"class": "form-control"}
+            )
+        # 9. その他デフォルト -> TextInput
         else:
-            # デフォルトはform-control適用
             widgets[field.name] = forms.TextInput(
                 attrs={"class": "form-control"}
             )
