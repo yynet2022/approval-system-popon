@@ -1,8 +1,12 @@
-from django.test import TestCase
-from django.utils import timezone
-from django.urls import reverse
 from datetime import timedelta
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
 from .models import Notification
+
+User = get_user_model()
 
 
 class NotificationTest(TestCase):
@@ -41,3 +45,38 @@ class NotificationTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.past_notice.content)
+
+
+class AdminPermissionTest(TestCase):
+    """
+    管理画面の権限テスト。
+    """
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            email="staff@example.com",
+            password="password123",
+            is_staff=True,
+            is_active=True
+        )
+        self.normal_user = User.objects.create_user(
+            email="normal@example.com",
+            password="password123",
+            is_staff=False,
+            is_active=True
+        )
+
+    def test_staff_can_access_admin(self):
+        """スタッフユーザーは管理画面にアクセスできる"""
+        self.client.force_login(self.staff_user)
+        url = reverse("admin:notification_notification_changelist")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_staff_cannot_access_admin(self):
+        """一般ユーザーは管理画面にアクセスできない"""
+        self.client.force_login(self.normal_user)
+        url = reverse("admin:notification_notification_changelist")
+        response = self.client.get(url)
+        # 権限がない場合、通常はログイン画面へリダイレクト(302)される
+        self.assertNotEqual(response.status_code, 200)
