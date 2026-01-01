@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import User, LoginToken
+
+from .models import LoginToken, User
 
 
 @admin.register(User)
@@ -10,7 +11,7 @@ class UserAdmin(admin.ModelAdmin):
         "first_name",
         "is_staff",
         "is_approver",
-        "is_active"
+        "is_active",
     )
     search_fields = ("email", "last_name", "first_name")
 

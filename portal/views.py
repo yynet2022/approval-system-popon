@@ -1,12 +1,13 @@
 from django.conf import settings
 from django.core.paginator import Paginator
 from django.db.models import F, Q
+from django.shortcuts import render
 from django.utils import timezone
 from django.views.generic import TemplateView
-from django.shortcuts import render
 
 from approvals.models import Approver, Request
 from notification.models import Notification
+
 from .forms import SearchForm
 
 
@@ -14,6 +15,7 @@ class DashboardView(TemplateView):
     """
     ポータル画面（ダッシュボード）。
     """
+
     template_name = "portal/index.html"
 
     def get_notifications(self):
@@ -23,7 +25,7 @@ class DashboardView(TemplateView):
         ).order_by("-published_at")
 
         paginator = Paginator(qs, settings.PORTAL_NOTIFICATIONS_PER_PAGE)
-        page_number = self.request.GET.get('n_page')
+        page_number = self.request.GET.get("n_page")
         return paginator.get_page(page_number)
 
     def get_requests(self, form):
@@ -66,22 +68,22 @@ class DashboardView(TemplateView):
         qs = qs.select_related("applicant").order_by("-submitted_at")
 
         paginator = Paginator(qs, settings.PORTAL_REQUESTS_PER_PAGE)
-        page_number = self.request.GET.get('page')
+        page_number = self.request.GET.get("page")
         return paginator.get_page(page_number)
 
     def get(self, request, *args, **kwargs):
         # Ajaxリクエスト（ヘッダーで判断）
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            target = request.GET.get('target')
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            target = request.GET.get("target")
             form = SearchForm(request.GET)
 
-            if target == 'notification':
-                context = {'notifications': self.get_notifications()}
+            if target == "notification":
+                context = {"notifications": self.get_notifications()}
                 template = "portal/partials/notification_list.html"
                 return render(request, template, context)
 
-            if target == 'request':
-                context = {'request_list': self.get_requests(form)}
+            if target == "request":
+                context = {"request_list": self.get_requests(form)}
                 template = "portal/partials/request_list.html"
                 return render(request, template, context)
 
@@ -104,27 +106,33 @@ class DashboardView(TemplateView):
         # 2. 承認依頼（ログイン時のみ）
         if user.is_authenticated:
             # 承認待ち (Approver と Request で絞り込み)
-            context["pending_approvals"] = Request.objects.filter(
-                status=Request.STATUS_PENDING,
-                approvers__user=user,
-                approvers__status=Approver.STATUS_PENDING,
-                approvers__order=F("current_step")
-            ).select_related("applicant").distinct().order_by("submitted_at")
+            context["pending_approvals"] = (
+                Request.objects.filter(
+                    status=Request.STATUS_PENDING,
+                    approvers__user=user,
+                    approvers__status=Approver.STATUS_PENDING,
+                    approvers__order=F("current_step"),
+                )
+                .select_related("applicant")
+                .distinct()
+                .order_by("submitted_at")
+            )
 
             # 差戻し（再申請待ち）
             context["remanded_requests"] = Request.objects.filter(
-                applicant=user,
-                status=Request.STATUS_REMANDED
+                applicant=user, status=Request.STATUS_REMANDED
             ).order_by("-updated_at")
 
         # 4. 利用可能な申請タイプ一覧 (メニュー用)
         # テンプレートからはクラス属性(_meta)にアクセスできないため辞書化して渡す
         available_types = []
         for cls in Request.get_request_types():
-            available_types.append({
-                "slug": cls.get_slug(),
-                "name": cls._meta.verbose_name,
-            })
+            available_types.append(
+                {
+                    "slug": cls.get_slug(),
+                    "name": cls._meta.verbose_name,
+                }
+            )
         context["available_request_types"] = available_types
 
         return context

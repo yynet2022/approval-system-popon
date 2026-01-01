@@ -1,11 +1,12 @@
 import logging
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect
-from django.template.loader import get_template
 from django.template import TemplateDoesNotExist
+from django.template.loader import get_template
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views import View
@@ -35,7 +36,7 @@ def save_approvers(request_obj, approvers_list):
             request=request_obj,
             user=approver_user,
             order=i,
-            status=Approver.STATUS_PENDING
+            status=Approver.STATUS_PENDING,
         )
 
 
@@ -55,7 +56,7 @@ def validate_approvers(request, approvers_list):
 
     # 連続した重複チェック (A -> A は不可)
     for i in range(len(approvers_list) - 1):
-        if approvers_list[i] == approvers_list[i+1]:
+        if approvers_list[i] == approvers_list[i + 1]:
             messages.error(
                 request, "同じ承認者を連続して設定することはできません。"
             )
@@ -69,6 +70,7 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
     申請作成の基底ビュー。
     共通の保存ロジック（承認者設定、ログ記録、メール送信）を持つ。
     """
+
     template_name = "approvals/request_form.html"
     success_url = reverse_lazy("portal:index")
     # request_prefix はサブクラスまたはインスタンスプロパティで定義
@@ -82,7 +84,9 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
 
         # 画面表示用にモデルの日本語名などを渡す
         if hasattr(self, "model_class"):
-            context["page_title"] = f"{self.model_class._meta.verbose_name} 作成"
+            context["page_title"] = (
+                f"{self.model_class._meta.verbose_name} 作成"
+            )
 
         return context
 
@@ -100,9 +104,11 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
 
         # その月の最新の申請番号を取得してロック
         qs = Request.objects.select_for_update()
-        latest_request = qs.filter(
-            request_number__startswith=prefix
-        ).order_by("-request_number").first()
+        latest_request = (
+            qs.filter(request_number__startswith=prefix)
+            .order_by("-request_number")
+            .first()
+        )
 
         if latest_request:
             last_num = int(latest_request.request_number.split("-")[-1])
@@ -152,7 +158,7 @@ class BaseRequestCreateView(LoginRequiredMixin, CreateView):
                     actor=self.request.user,
                     action=ApprovalLog.ACTION_SUBMIT,
                     step=None,
-                    comment="新規申請"
+                    comment="新規申請",
                 )
 
                 # 5. メール通知（最初の承認者へ）
@@ -203,6 +209,7 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
     """
     再申請ビュー。
     """
+
     model = Request
     template_name = "approvals/request_form.html"
     success_url = reverse_lazy("portal:index")
@@ -222,9 +229,12 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         # 申請者本人のもので、差戻し状態のものに限る
-        return super().get_queryset().filter(
-            applicant=self.request.user,
-            status=Request.STATUS_REMANDED
+        return (
+            super()
+            .get_queryset()
+            .filter(
+                applicant=self.request.user, status=Request.STATUS_REMANDED
+            )
         )
 
     def get_context_data(self, **kwargs):
@@ -287,7 +297,7 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
                     actor=self.request.user,
                     action=ApprovalLog.ACTION_RESUBMIT,
                     step=None,
-                    comment="再申請"
+                    comment="再申請",
                 )
 
                 # メール通知
@@ -299,7 +309,7 @@ class RequestUpdateView(LoginRequiredMixin, UpdateView):
 
             messages.success(
                 self.request,
-                f"申請 {self.object.request_number} を再提出しました。"
+                f"申請 {self.object.request_number} を再提出しました。",
             )
             return redirect(self.success_url)
 
@@ -313,16 +323,17 @@ class RequestDetailView(DetailView):
     """
     申請詳細画面。
     """
+
     model = Request
     template_name = "approvals/request_detail.html"
     context_object_name = "req"
 
     def get_queryset(self):
-        return super().get_queryset().select_related(
-            "applicant"
-        ).prefetch_related(
-            "approvers__user",
-            "logs__actor"
+        return (
+            super()
+            .get_queryset()
+            .select_related("applicant")
+            .prefetch_related("approvers__user", "logs__actor")
         )
 
     def get_object(self, queryset=None):
@@ -356,7 +367,7 @@ class RequestDetailView(DetailView):
             current_approver = req.approvers.filter(
                 order=req.current_step,
                 user=user,
-                status=Approver.STATUS_PENDING
+                status=Approver.STATUS_PENDING,
             ).first()
             if current_approver:
                 can_approve = True
@@ -377,18 +388,17 @@ class RequestDetailView(DetailView):
             context["can_withdraw"] = req.status in [
                 Request.STATUS_PENDING,
                 Request.STATUS_APPROVED,
-                Request.STATUS_REMANDED
+                Request.STATUS_REMANDED,
             ]
-            context["can_resubmit"] = (
-                req.status == Request.STATUS_REMANDED
-            )
+            context["can_resubmit"] = req.status == Request.STATUS_REMANDED
         else:
             context["can_withdraw"] = False
             context["can_resubmit"] = False
 
         # 管理者向け代理差戻しフラグ
         if user.is_staff and req.status in [
-            Request.STATUS_PENDING, Request.STATUS_APPROVED
+            Request.STATUS_PENDING,
+            Request.STATUS_APPROVED,
         ]:
             context["can_proxy_remand"] = True
         else:
@@ -413,6 +423,7 @@ class RequestActionView(LoginRequiredMixin, View):
     """
     承認アクション実行ビュー。
     """
+
     def post(self, request, pk):
         req = get_object_or_404(Request, pk=pk)
         form = ActionForm(request.POST)
@@ -434,50 +445,56 @@ class RequestActionView(LoginRequiredMixin, View):
                 approver = None
 
                 if action == "reject":
-                    if req.status not in [Request.STATUS_PENDING,
-                                          Request.STATUS_APPROVED]:
+                    if req.status not in [
+                        Request.STATUS_PENDING,
+                        Request.STATUS_APPROVED,
+                    ]:
                         messages.error(
-                            request,
-                            "この申請は却下可能な状態ではありません。"
+                            request, "この申請は却下可能な状態ではありません。"
                         )
                         return redirect("approvals:detail", pk=pk)
 
                     if req.status == Request.STATUS_APPROVED:
-                        approver = Approver.objects \
-                                           .select_for_update() \
-                                           .filter(
-                                               request=req,
-                                               user=request.user
-                                           ).first()
+                        approver = (
+                            Approver.objects.select_for_update()
+                            .filter(request=req, user=request.user)
+                            .first()
+                        )
                     else:
-                        approver = Approver.objects \
-                            .select_for_update().filter(
+                        approver = (
+                            Approver.objects.select_for_update()
+                            .filter(
                                 request=req,
                                 order=req.current_step,
                                 user=request.user,
-                                status=Approver.STATUS_PENDING
-                            ).first()
+                                status=Approver.STATUS_PENDING,
+                            )
+                            .first()
+                        )
 
                 else:
                     if req.status != Request.STATUS_PENDING:
                         messages.error(
                             request,
-                            "この申請は既に処理されているか、取り下げられています。"
+                            "この申請は既に処理されているか、取り下げられています。",
                         )
                         return redirect("approvals:detail", pk=pk)
 
-                    approver = Approver.objects \
-                        .select_for_update().filter(
+                    approver = (
+                        Approver.objects.select_for_update()
+                        .filter(
                             request=req,
                             order=req.current_step,
                             user=request.user,
-                            status=Approver.STATUS_PENDING
-                        ).first()
+                            status=Approver.STATUS_PENDING,
+                        )
+                        .first()
+                    )
 
                 if not approver:
                     messages.error(
                         request,
-                        "あなたはこの申請に対して操作を行う権限がありません。"
+                        "あなたはこの申請に対して操作を行う権限がありません。",
                     )
                     return redirect("approvals:detail", pk=pk)
 
@@ -506,8 +523,11 @@ class RequestActionView(LoginRequiredMixin, View):
                         NotificationService.send_approved(req, request)
 
                     self.log_action(
-                        req, request.user, ApprovalLog.ACTION_APPROVE,
-                        req.current_step, comment
+                        req,
+                        request.user,
+                        ApprovalLog.ACTION_APPROVE,
+                        req.current_step,
+                        comment,
                     )
                     messages.success(request, "承認しました。")
 
@@ -526,8 +546,11 @@ class RequestActionView(LoginRequiredMixin, View):
                     )
 
                     self.log_action(
-                        req, request.user, ApprovalLog.ACTION_REMAND,
-                        req.current_step, comment
+                        req,
+                        request.user,
+                        ApprovalLog.ACTION_REMAND,
+                        req.current_step,
+                        comment,
                     )
                     messages.warning(request, "差戻しました。")
 
@@ -546,8 +569,11 @@ class RequestActionView(LoginRequiredMixin, View):
                     )
 
                     self.log_action(
-                        req, request.user, ApprovalLog.ACTION_REJECT,
-                        req.current_step, comment
+                        req,
+                        request.user,
+                        ApprovalLog.ACTION_REJECT,
+                        req.current_step,
+                        comment,
                     )
                     messages.error(request, "却下しました。")
 
@@ -562,11 +588,7 @@ class RequestActionView(LoginRequiredMixin, View):
 
     def log_action(self, req, actor, action, step, comment):
         ApprovalLog.objects.create(
-            request=req,
-            actor=actor,
-            action=action,
-            step=step,
-            comment=comment
+            request=req, actor=actor, action=action, step=step, comment=comment
         )
 
 
@@ -574,6 +596,7 @@ class RequestWithdrawView(LoginRequiredMixin, View):
     """
     申請取り下げビュー。
     """
+
     def post(self, request, pk):
         req = get_object_or_404(Request, pk=pk)
 
@@ -586,17 +609,16 @@ class RequestWithdrawView(LoginRequiredMixin, View):
                 req = Request.objects.select_for_update().get(pk=pk)
 
                 if req.status not in [
-                        Request.STATUS_PENDING,
-                        Request.STATUS_APPROVED,
-                        Request.STATUS_REMANDED
+                    Request.STATUS_PENDING,
+                    Request.STATUS_APPROVED,
+                    Request.STATUS_REMANDED,
                 ]:
                     messages.error(
                         request, "この申請は取り下げ可能な状態ではありません。"
                     )
                     return redirect("approvals:detail", pk=pk)
 
-                is_remanded_withdraw = (
-                    req.status == Request.STATUS_REMANDED)
+                is_remanded_withdraw = req.status == Request.STATUS_REMANDED
 
                 req.status = Request.STATUS_WITHDRAWN
                 req.save()
@@ -609,7 +631,7 @@ class RequestWithdrawView(LoginRequiredMixin, View):
                     actor=request.user,
                     action=ApprovalLog.ACTION_WITHDRAW,
                     step=None,
-                    comment="申請者による取り下げ"
+                    comment="申請者による取り下げ",
                 )
 
             messages.info(request, "申請を取り下げました。")
@@ -625,6 +647,7 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     代理差戻しビュー（管理者用）。
     """
+
     def test_func(self):
         return self.request.user.is_staff
 
@@ -646,8 +669,8 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
                 req = Request.objects.select_for_update().get(pk=pk)
 
                 if req.status not in [
-                        Request.STATUS_PENDING,
-                        Request.STATUS_APPROVED
+                    Request.STATUS_PENDING,
+                    Request.STATUS_APPROVED,
                 ]:
                     messages.error(
                         request, "この申請は差戻し可能な状態ではありません。"
@@ -671,7 +694,7 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
                     actor=request.user,
                     action=ApprovalLog.ACTION_PROXY_REMAND,
                     step=req.current_step,
-                    comment=comment
+                    comment=comment,
                 )
 
                 NotificationService.send_proxy_remanded(
@@ -682,8 +705,7 @@ class RequestProxyRemandView(LoginRequiredMixin, UserPassesTestMixin, View):
 
         except Exception as e:
             logger.error(
-                f"Error in RequestProxyRemandView: {e}",
-                exc_info=True
+                f"Error in RequestProxyRemandView: {e}", exc_info=True
             )
             messages.error(request, f"エラーが発生しました: {e}")
 

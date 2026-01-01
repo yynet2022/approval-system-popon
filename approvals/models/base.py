@@ -9,6 +9,7 @@ class Request(BaseModel):
     申請の基底モデル（マルチテーブル継承の親）。
     全ての申請タイプに共通するフィールドとロジックを定義する。
     """
+
     STATUS_DRAFT = 0
     STATUS_PENDING = 1
     STATUS_APPROVED = 2
@@ -26,36 +27,25 @@ class Request(BaseModel):
     ]
 
     request_number = models.CharField(
-        max_length=20,
-        unique=True,
-        verbose_name="申請番号"
+        max_length=20, unique=True, verbose_name="申請番号"
     )
     applicant = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        verbose_name="申請者"
+        verbose_name="申請者",
     )
-    title = models.CharField(
-        max_length=100,
-        verbose_name="件名"
-    )
+    title = models.CharField(max_length=100, verbose_name="件名")
     status = models.IntegerField(
-        choices=STATUS_CHOICES,
-        default=STATUS_DRAFT,
-        verbose_name="ステータス"
+        choices=STATUS_CHOICES, default=STATUS_DRAFT, verbose_name="ステータス"
     )
     current_step = models.IntegerField(
-        default=1,
-        verbose_name="現在のステップ"
+        default=1, verbose_name="現在のステップ"
     )
     submitted_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="申請日時"
+        null=True, blank=True, verbose_name="申請日時"
     )
     is_restricted = models.BooleanField(
-        default=False,
-        verbose_name="閲覧制限フラグ"
+        default=False, verbose_name="閲覧制限フラグ"
     )
 
     # クラスごとの設定（サブクラスでオーバーライド）
@@ -67,6 +57,7 @@ class Request(BaseModel):
         """
         利用可能な申請タイプ（Requestの具象サブクラス）のリストを返す。
         """
+
         def get_all_subs(p):
             for sub in p.__subclasses__():
                 # 孫クラスを再帰的に取得
@@ -148,10 +139,7 @@ class Request(BaseModel):
             if hasattr(self, f"get_{field.name}_display"):
                 value = getattr(self, f"get_{field.name}_display")()
 
-            data.append({
-                "label": field.verbose_name,
-                "value": value
-            })
+            data.append({"label": field.verbose_name, "value": value})
         return data
 
     @property
@@ -183,6 +171,7 @@ class Approver(BaseModel):
     承認者設定モデル。
     Requestモデルに紐づく。
     """
+
     STATUS_PENDING = 0
     STATUS_APPROVED = 1
     STATUS_REMANDED = 2
@@ -196,31 +185,20 @@ class Approver(BaseModel):
     ]
 
     request = models.ForeignKey(
-        Request,
-        on_delete=models.CASCADE,
-        related_name="approvers"
+        Request, on_delete=models.CASCADE, related_name="approvers"
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        verbose_name="承認者"
+        verbose_name="承認者",
     )
-    order = models.IntegerField(
-        verbose_name="順序"
-    )
+    order = models.IntegerField(verbose_name="順序")
     status = models.IntegerField(
-        choices=STATUS_CHOICES,
-        default=STATUS_PENDING,
-        verbose_name="判定状態"
+        choices=STATUS_CHOICES, default=STATUS_PENDING, verbose_name="判定状態"
     )
-    comment = models.TextField(
-        blank=True,
-        verbose_name="承認者コメント"
-    )
+    comment = models.TextField(blank=True, verbose_name="承認者コメント")
     processed_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="処理日時"
+        null=True, blank=True, verbose_name="処理日時"
     )
 
     class Meta:
@@ -236,6 +214,7 @@ class ApprovalLog(BaseModel):
     承認履歴ログモデル。
     Requestモデルに紐づく。
     """
+
     ACTION_SUBMIT = 1
     ACTION_APPROVE = 2
     ACTION_REMAND = 3
@@ -255,29 +234,20 @@ class ApprovalLog(BaseModel):
     ]
 
     request = models.ForeignKey(
-        Request,
-        on_delete=models.CASCADE,
-        related_name="logs"
+        Request, on_delete=models.CASCADE, related_name="logs"
     )
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        verbose_name="実行者"
+        verbose_name="実行者",
     )
     action = models.IntegerField(
-        choices=ACTION_CHOICES,
-        verbose_name="アクション"
+        choices=ACTION_CHOICES, verbose_name="アクション"
     )
     step = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name="実行時のステップ"
+        null=True, blank=True, verbose_name="実行時のステップ"
     )
-    comment = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="コメント"
-    )
+    comment = models.TextField(blank=True, null=True, verbose_name="コメント")
 
     class Meta:
         ordering = ["created_at"]

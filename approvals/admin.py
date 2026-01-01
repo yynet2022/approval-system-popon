@@ -1,12 +1,12 @@
 from django.contrib import admin
 
 from .models import (
-    Approver,
     ApprovalLog,
+    Approver,
 )
 from .models.types import (
-    SimpleRequest,
     LocalBusinessTripRequest,
+    SimpleRequest,
 )
 
 

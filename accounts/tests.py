@@ -1,15 +1,18 @@
 # accounts/tests.py
 from datetime import timedelta
+
 from django.test import TestCase
-from django.utils import timezone
 from django.urls import reverse
-from .models import User, LoginToken
+from django.utils import timezone
+
+from .models import LoginToken, User
 
 
 class UserAuthTest(TestCase):
     """
     認証周りのテスト。
     """
+
     def setUp(self):
         self.email = "test@example.com"
 

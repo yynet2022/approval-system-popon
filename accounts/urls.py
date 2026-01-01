@@ -10,17 +10,17 @@ urlpatterns = [
     path(
         "login/verify/<str:token>/",
         views.VerifyTokenView.as_view(),
-        name="verify"
+        name="verify",
     ),
     path("logout/", views.LogoutView.as_view(), name="logout"),
     path(
         "approver-autocomplete/",
         views.ApproverAutocomplete.as_view(),
-        name="approver-autocomplete"
+        name="approver-autocomplete",
     ),
     path(
         "active-user-autocomplete/",
         views.ActiveUserAutocomplete.as_view(),
-        name="active-user-autocomplete"
+        name="active-user-autocomplete",
     ),
 ]

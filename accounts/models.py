@@ -50,36 +50,21 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     """
 
     email = models.EmailField(
-        unique=True,
-        blank=False,
-        null=False,
-        verbose_name="メールアドレス"
+        unique=True, blank=False, null=False, verbose_name="メールアドレス"
     )
-    last_name = models.CharField(
-        max_length=150,
-        blank=True,
-        verbose_name="姓"
-    )
+    last_name = models.CharField(max_length=150, blank=True, verbose_name="姓")
     first_name = models.CharField(
-        max_length=150,
-        blank=True,
-        verbose_name="名"
+        max_length=150, blank=True, verbose_name="名"
     )
     is_staff = models.BooleanField(
-        default=False,
-        verbose_name="管理サイトアクセス権限"
+        default=False, verbose_name="管理サイトアクセス権限"
     )
-    is_active = models.BooleanField(
-        default=False,
-        verbose_name="有効フラグ"
-    )
+    is_active = models.BooleanField(default=False, verbose_name="有効フラグ")
     is_approver = models.BooleanField(
-        default=False,
-        verbose_name="承認者候補フラグ"
+        default=False, verbose_name="承認者候補フラグ"
     )
     date_joined = models.DateTimeField(
-        default=timezone.now,
-        verbose_name="登録日時"
+        default=timezone.now, verbose_name="登録日時"
     )
 
     objects = UserManager()
@@ -111,13 +96,9 @@ class LoginToken(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="login_tokens"
+        related_name="login_tokens",
     )
-    token = models.CharField(
-        max_length=64,
-        unique=True,
-        db_index=True
-    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
     expires_at = models.DateTimeField()
 
     @classmethod
@@ -128,7 +109,5 @@ class LoginToken(BaseModel):
         token = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timedelta(minutes=30)
         return cls.objects.create(
-            user=user,
-            token=token,
-            expires_at=expires_at
+            user=user, token=token, expires_at=expires_at
         )

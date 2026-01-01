@@ -1,4 +1,4 @@
-from .base import Request, Approver, ApprovalLog
 from . import types  # noqa: F401
+from .base import ApprovalLog, Approver, Request
 
-__all__ = ['Request', 'Approver', 'ApprovalLog']
+__all__ = ["Request", "Approver", "ApprovalLog"]

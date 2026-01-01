@@ -1,7 +1,8 @@
-from dal import autocomplete
 from django import forms
 from django.db import models
 from django.forms import inlineformset_factory, modelform_factory
+
+from dal import autocomplete
 
 from .models import Approver, Request
 
@@ -43,9 +44,7 @@ def create_request_form_class(model_class):
 
         # 1. 選択肢があるフィールド、または外部キー -> Select
         if field.choices or isinstance(field, models.ForeignKey):
-            widgets[field.name] = forms.Select(
-                attrs={"class": "form-select"}
-            )
+            widgets[field.name] = forms.Select(attrs={"class": "form-select"})
         # 2. ブール値 -> Checkbox
         elif isinstance(field, models.BooleanField):
             widgets[field.name] = forms.CheckboxInput(
@@ -69,7 +68,7 @@ def create_request_form_class(model_class):
         # 6. 数値
         elif isinstance(
             field,
-            (models.IntegerField, models.DecimalField, models.FloatField)
+            (models.IntegerField, models.DecimalField, models.FloatField),
         ):
             widgets[field.name] = forms.NumberInput(
                 attrs={"class": "form-control"}
@@ -92,9 +91,7 @@ def create_request_form_class(model_class):
 
     # フォームクラス生成
     return modelform_factory(
-        model_class,
-        exclude=exclude_fields,
-        widgets=widgets
+        model_class, exclude=exclude_fields, widgets=widgets
     )
 
 
@@ -102,6 +99,7 @@ class ApproverForm(forms.ModelForm):
     """
     承認者設定用フォーム（FormSetで使用）。
     """
+
     class Meta:
         model = Approver
         fields = ("user", "order")
@@ -110,8 +108,8 @@ class ApproverForm(forms.ModelForm):
                 url="accounts:approver-autocomplete",
                 attrs={
                     "data-placeholder": "承認者を検索...",
-                    "class": "form-control"
-                }
+                    "class": "form-control",
+                },
             ),
             "order": forms.HiddenInput(),  # 順序はJSで制御するため隠す
         }
@@ -147,9 +145,9 @@ ApproverFormSet = inlineformset_factory(
     Request,  # 汎用的にRequestを親とする
     Approver,
     form=ApproverForm,
-    extra=2,      # 初期表示数
-    max_num=5,    # 最大数
-    can_delete=False
+    extra=2,  # 初期表示数
+    max_num=5,  # 最大数
+    can_delete=False,
 )
 
 
@@ -157,9 +155,10 @@ class ActionForm(forms.Form):
     """
     承認アクション用フォーム（コメント入力用）。
     """
+
     comment = forms.CharField(
         label="コメント",
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         required=False,  # アクションによって必須かどうかが変わるため
-        help_text="承認時は任意、それ以外（差戻・却下等）は必須です。"
+        help_text="承認時は任意、それ以外（差戻・却下等）は必須です。",
     )

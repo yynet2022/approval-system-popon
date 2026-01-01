@@ -7,6 +7,7 @@ class NotificationDetailView(DetailView):
     """
     お知らせ詳細画面。
     """
+
     model = Notification
     template_name = "notification/detail.html"
     context_object_name = "notification"

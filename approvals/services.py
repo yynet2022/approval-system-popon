@@ -1,4 +1,5 @@
 import logging
+
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
@@ -43,7 +44,8 @@ class NotificationService:
 
         if not to_emails:
             logger.warning(
-                f"No valid TO email addresses for subject: {subject}")
+                f"No valid TO email addresses for subject: {subject}"
+            )
             return
 
         message_body = render_to_string(template_name, context)
@@ -54,13 +56,13 @@ class NotificationService:
                 body=message_body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=to_emails,
-                cc=cc_emails
+                cc=cc_emails,
             )
             email.send(fail_silently=False)
         except Exception as e:
             logger.error(
                 f"Failed to send email (Subject: {subject}): {e}",
-                exc_info=True
+                exc_info=True,
             )
 
     @classmethod
@@ -68,7 +70,7 @@ class NotificationService:
         """
         申請詳細ページのURLを生成する
         """
-        path = reverse('approvals:detail', kwargs={'pk': request_obj.pk})
+        path = reverse("approvals:detail", kwargs={"pk": request_obj.pk})
         if request:
             return request.build_absolute_uri(path)
 
@@ -83,11 +85,11 @@ class NotificationService:
         """
         subject = f"[{settings.PROJECT_NAME}] 承認依頼: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "link": cls._get_detail_url(request_obj, request),
         }
         cls._send_email(
-            next_approver, subject, 'emails/approval_request.txt', context
+            next_approver, subject, "emails/approval_request.txt", context
         )
 
     @classmethod
@@ -98,11 +100,11 @@ class NotificationService:
         """
         subject = f"[{settings.PROJECT_NAME}] 再承認依頼: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "link": cls._get_detail_url(request_obj, request),
         }
         cls._send_email(
-            first_approver, subject, 'emails/resubmitted.txt', context
+            first_approver, subject, "emails/resubmitted.txt", context
         )
 
     @classmethod
@@ -116,16 +118,16 @@ class NotificationService:
 
         subject = f"[{settings.PROJECT_NAME}] 承認完了: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "link": cls._get_detail_url(request_obj, request),
         }
 
         cls._send_email(
             request_obj.applicant,
             subject,
-            'emails/approved.txt',
+            "emails/approved.txt",
             context,
-            cc_users=cc_users
+            cc_users=cc_users,
         )
 
     @classmethod
@@ -146,18 +148,18 @@ class NotificationService:
 
         subject = f"[{settings.PROJECT_NAME}] 差戻し: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'actor': actor,
-            'comment': comment,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "actor": actor,
+            "comment": comment,
+            "link": cls._get_detail_url(request_obj, request),
         }
 
         cls._send_email(
             request_obj.applicant,
             subject,
-            'emails/remanded.txt',
+            "emails/remanded.txt",
             context,
-            cc_users=list(cc_users)
+            cc_users=list(cc_users),
         )
 
     @classmethod
@@ -178,18 +180,18 @@ class NotificationService:
 
         subject = f"[{settings.PROJECT_NAME}] 却下: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'actor': actor,
-            'comment': comment,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "actor": actor,
+            "comment": comment,
+            "link": cls._get_detail_url(request_obj, request),
         }
 
         cls._send_email(
             request_obj.applicant,
             subject,
-            'emails/rejected.txt',
+            "emails/rejected.txt",
             context,
-            cc_users=list(cc_users)
+            cc_users=list(cc_users),
         )
 
     @classmethod
@@ -201,8 +203,7 @@ class NotificationService:
         """
         # To: 現在の承認者
         current_approver_obj = request_obj.approvers.filter(
-            status=Approver.STATUS_PENDING,
-            order=request_obj.current_step
+            status=Approver.STATUS_PENDING, order=request_obj.current_step
         ).first()
 
         to_user = current_approver_obj.user if current_approver_obj else None
@@ -215,17 +216,17 @@ class NotificationService:
 
         subject = f"[{settings.PROJECT_NAME}] 取り下げ: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "link": cls._get_detail_url(request_obj, request),
         }
 
         if to_user:
             cls._send_email(
                 to_user,
                 subject,
-                'emails/withdrawn.txt',
+                "emails/withdrawn.txt",
                 context,
-                cc_users=cc_users
+                cc_users=cc_users,
             )
         else:
             # 万が一現在の承認者がいない場合(イレギュラー)はCcの人にToで送るなどの救済が必要だが
@@ -234,8 +235,8 @@ class NotificationService:
                 cls._send_email(
                     cc_users,  # リストを渡して全員TOにする
                     subject,
-                    'emails/withdrawn.txt',
-                    context
+                    "emails/withdrawn.txt",
+                    context,
                 )
 
     @classmethod
@@ -259,20 +260,18 @@ class NotificationService:
         related = approved | current
         cc_users = list(set(approver.user for approver in related))
 
-        subject = (
-            f"[{settings.PROJECT_NAME}] 代理差戻し: {request_obj.title}"
-        )
+        subject = f"[{settings.PROJECT_NAME}] 代理差戻し: {request_obj.title}"
         context = {
-            'request_obj': request_obj,
-            'actor': actor,
-            'comment': comment,
-            'link': cls._get_detail_url(request_obj, request),
+            "request_obj": request_obj,
+            "actor": actor,
+            "comment": comment,
+            "link": cls._get_detail_url(request_obj, request),
         }
 
         cls._send_email(
             request_obj.applicant,
             subject,
-            'emails/proxy_remanded.txt',
+            "emails/proxy_remanded.txt",
             context,
-            cc_users=cc_users
+            cc_users=cc_users,
         )

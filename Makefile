@@ -14,7 +14,14 @@ all:
 	@echo "# python manage.py setup_test_data --no-color"
 
 check:
-	for i in accounts approvals config core notification portal; do flake8 --exclude migrations $$i/ || true; done
+	isort . --check | cat
+	black . --check | cat
+	flake8 --exclude migrations .
+	mypy .
+
+format:
+	isort .
+	black . | cat
 
 test:
 	python manage.py test

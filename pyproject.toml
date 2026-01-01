@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "approval-system-popon"
+version = "0.1.0"
+description = "Django を用いたシンプルかつ拡張性の高い Web ベースの承認ワークフローシステム"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "YYNET"},
+]
+license = {text = "MIT"}
+dependencies = [
+    "Django==4.2.27",
+    "django-autocomplete-light==3.12.1",
+    "tomli; python_version < '3.11'",
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8",
+    "black",
+    "isort",
+    "mypy",
+    "django-stubs",
+]
+
+[tool.setuptools]
+packages = ["accounts", "approvals", "config", "core", "notification", "portal"]
+
+[tool.black]
+line-length = 79
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 79
+known_django = "django"
+sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+color_output = false
+
+[tool.mypy]
+python_version = "3.9"
+plugins = ["mypy_django_plugin.main"]
+color_output = false
+ignore_missing_imports = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings"

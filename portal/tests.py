@@ -1,6 +1,7 @@
 # portal/tests.py
 from django.test import TestCase
 from django.urls import reverse
+
 from accounts.models import User
 from approvals.models import Approver, Request
 from approvals.models.types import SimpleRequest
@@ -10,6 +11,7 @@ class PortalViewTest(TestCase):
     """
     ポータル画面の表示テスト。
     """
+
     def setUp(self):
         self.user = User.objects.create_user(
             email="portal@example.com", is_active=True
@@ -21,12 +23,12 @@ class PortalViewTest(TestCase):
     def test_dashboard_pending_approvals(self):
         """「承認依頼」エリアの表示テスト"""
         req = SimpleRequest.objects.create(
-            title="自分宛の依頼", applicant=self.user,
-            status=Request.STATUS_PENDING, request_number="REQ-P1"
+            title="自分宛の依頼",
+            applicant=self.user,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-P1",
         )
-        Approver.objects.create(
-            request=req, user=self.approver, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver, order=1)
 
         self.client.force_login(self.approver)
         url = reverse("portal:index")
@@ -38,12 +40,16 @@ class PortalViewTest(TestCase):
         """検索機能とステータスフィルタのテスト"""
         # データ準備
         SimpleRequest.objects.create(
-            title="承認済みりんご", applicant=self.user,
-            status=Request.STATUS_APPROVED, request_number="REQ-AP"
+            title="承認済みりんご",
+            applicant=self.user,
+            status=Request.STATUS_APPROVED,
+            request_number="REQ-AP",
         )
         SimpleRequest.objects.create(
-            title="申請中みかん", applicant=self.user,
-            status=Request.STATUS_PENDING, request_number="REQ-PE"
+            title="申請中みかん",
+            applicant=self.user,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-PE",
         )
 
         url = reverse("portal:index")
@@ -63,13 +69,17 @@ class PortalViewTest(TestCase):
         """一覧画面での閲覧制限テスト"""
         # 公開の申請
         SimpleRequest.objects.create(
-            title="みんな見てね", applicant=self.user,
-            is_restricted=False, request_number="REQ-PUB"
+            title="みんな見てね",
+            applicant=self.user,
+            is_restricted=False,
+            request_number="REQ-PUB",
         )
         # 非公開の申請（作成者は self.user）
         SimpleRequest.objects.create(
-            title="秘密だよ", applicant=self.user,
-            is_restricted=True, request_number="REQ-SEC"
+            title="秘密だよ",
+            applicant=self.user,
+            is_restricted=True,
+            request_number="REQ-SEC",
         )
 
         # 第三者（approver）でログイン

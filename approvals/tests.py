@@ -1,25 +1,29 @@
 # approvals/tests.py
+import logging
+
 from django.conf import settings
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
-from django.core import mail
+
 from accounts.models import User
+
 from .models import Approver, Request
-from .models.types import SimpleRequest, LocalBusinessTripRequest
-import logging
+from .models.types import LocalBusinessTripRequest, SimpleRequest
 
 
 class ApprovalWorkflowTest(TestCase):
     """
     承認ワークフローのテスト。
     """
+
     def setUp(self):
         # ユーザーの用意
         self.applicant = User.objects.create_user(
             email="applicant@example.com",
             is_active=True,
             last_name="申",
-            first_name="請太郎"
+            first_name="請太郎",
         )
         self.approver1 = User.objects.create_user(
             email="app1@example.com", is_active=True, is_approver=True
@@ -40,7 +44,8 @@ class ApprovalWorkflowTest(TestCase):
             "trip_date": "2025-12-30",
             "destination": "大阪支社",
             "note": "日帰り",
-            "approvers-TOTAL_FORMS": "1", "approvers-INITIAL_FORMS": "0",
+            "approvers-TOTAL_FORMS": "1",
+            "approvers-INITIAL_FORMS": "0",
             "approvers-0-user": str(self.approver1.id),
             "approvers-0-order": "1",
         }
@@ -60,8 +65,10 @@ class ApprovalWorkflowTest(TestCase):
 
         # ケース1: 承認者が自分自身
         data_self = {
-            "title": "自分承認", "content": "ダメ",
-            "approvers-TOTAL_FORMS": "1", "approvers-INITIAL_FORMS": "0",
+            "title": "自分承認",
+            "content": "ダメ",
+            "approvers-TOTAL_FORMS": "1",
+            "approvers-INITIAL_FORMS": "0",
             "approvers-0-user": str(self.applicant.id),
             "approvers-0-order": "1",
         }
@@ -72,8 +79,10 @@ class ApprovalWorkflowTest(TestCase):
 
         # ケース2: 同じ承認者が連続
         data_dup = {
-            "title": "連続承認", "content": "ダメ",
-            "approvers-TOTAL_FORMS": "2", "approvers-INITIAL_FORMS": "0",
+            "title": "連続承認",
+            "content": "ダメ",
+            "approvers-TOTAL_FORMS": "2",
+            "approvers-INITIAL_FORMS": "0",
             "approvers-0-user": str(self.approver1.id),
             "approvers-0-order": "1",
             "approvers-1-user": str(self.approver1.id),
@@ -89,8 +98,10 @@ class ApprovalWorkflowTest(TestCase):
         self.client.force_login(self.applicant)
         url = reverse("approvals:create", kwargs={"request_type": "simple"})
         data = {
-            "title": "メール確認用", "content": "内容は問わない",
-            "approvers-TOTAL_FORMS": "1", "approvers-INITIAL_FORMS": "0",
+            "title": "メール確認用",
+            "content": "内容は問わない",
+            "approvers-TOTAL_FORMS": "1",
+            "approvers-INITIAL_FORMS": "0",
             "approvers-0-user": str(self.approver1.id),
             "approvers-0-order": "1",
         }
@@ -104,12 +115,12 @@ class ApprovalWorkflowTest(TestCase):
     def test_reject_action(self):
         """却下アクションのテスト"""
         req = SimpleRequest.objects.create(
-            title="却下テスト", applicant=self.applicant,
-            status=Request.STATUS_PENDING, request_number="REQ-REJ"
+            title="却下テスト",
+            applicant=self.applicant,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-REJ",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         self.client.force_login(self.approver1)
         action_url = reverse("approvals:action", kwargs={"pk": req.id})
@@ -134,12 +145,12 @@ class ApprovalWorkflowTest(TestCase):
     def test_withdraw_action(self):
         """取り下げアクションのテスト"""
         req = SimpleRequest.objects.create(
-            title="取り下げテスト", applicant=self.applicant,
-            status=Request.STATUS_PENDING, request_number="REQ-WD"
+            title="取り下げテスト",
+            applicant=self.applicant,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-WD",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         # 申請者ログイン
         self.client.force_login(self.applicant)
@@ -161,17 +172,17 @@ class ApprovalWorkflowTest(TestCase):
     def test_proxy_remand_action(self):
         """管理者による代理差戻しテスト"""
         req = SimpleRequest.objects.create(
-            title="代理差戻し", applicant=self.applicant,
-            status=Request.STATUS_PENDING, request_number="REQ-PROXY"
+            title="代理差戻し",
+            applicant=self.applicant,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-PROXY",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         url = reverse("approvals:proxy-remand", kwargs={"pk": req.id})
 
         # 一時的に黙らせる。PermissionDenied はウザい
-        logger = logging.getLogger('django.request')
+        logger = logging.getLogger("django.request")
         previous_level = logger.getEffectiveLevel()
         logger.setLevel(logging.CRITICAL)
         # 一般ユーザー（approver1）ではアクセス不可
@@ -194,13 +205,13 @@ class ApprovalWorkflowTest(TestCase):
     def test_restricted_access(self):
         """閲覧制限のテスト"""
         req = SimpleRequest.objects.create(
-            title="秘密の申請", applicant=self.applicant,
-            is_restricted=True, status=Request.STATUS_PENDING,
-            request_number="REQ-SEC"
+            title="秘密の申請",
+            applicant=self.applicant,
+            is_restricted=True,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-SEC",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         # 関係者以外（approver2）でログイン
         self.client.force_login(self.approver2)
@@ -215,15 +226,13 @@ class ApprovalWorkflowTest(TestCase):
         """承認ワークフロー（中間承認 -> 最終承認）のテスト"""
         # 申請作成（2段階承認）
         req = SimpleRequest.objects.create(
-            title="多段階承認", applicant=self.applicant,
-            status=Request.STATUS_PENDING, request_number="REQ-MULTI"
+            title="多段階承認",
+            applicant=self.applicant,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-MULTI",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
-        Approver.objects.create(
-            request=req, user=self.approver2, order=2
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
+        Approver.objects.create(request=req, user=self.approver2, order=2)
 
         # 1. 最初の承認者による承認
         self.client.force_login(self.approver1)
@@ -250,12 +259,12 @@ class ApprovalWorkflowTest(TestCase):
     def test_remand_action(self):
         """差戻しアクションのテスト"""
         req = SimpleRequest.objects.create(
-            title="差戻しテスト", applicant=self.applicant,
-            status=Request.STATUS_PENDING, request_number="REQ-REM"
+            title="差戻しテスト",
+            applicant=self.applicant,
+            status=Request.STATUS_PENDING,
+            request_number="REQ-REM",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         self.client.force_login(self.approver1)
         action_url = reverse("approvals:action", kwargs={"pk": req.id})
@@ -287,13 +296,17 @@ class ApprovalWorkflowTest(TestCase):
         """再申請アクションのテスト"""
         # 差戻し状態の申請を作成
         req = SimpleRequest.objects.create(
-            title="再申請テスト", applicant=self.applicant,
-            status=Request.STATUS_REMANDED, request_number="REQ-RESUB",
-            current_step=1
+            title="再申請テスト",
+            applicant=self.applicant,
+            status=Request.STATUS_REMANDED,
+            request_number="REQ-RESUB",
+            current_step=1,
         )
         app_rec = Approver.objects.create(
-            request=req, user=self.approver1, order=1,
-            status=Approver.STATUS_REMANDED
+            request=req,
+            user=self.approver1,
+            order=1,
+            status=Approver.STATUS_REMANDED,
         )
 
         self.client.force_login(self.applicant)
@@ -301,8 +314,10 @@ class ApprovalWorkflowTest(TestCase):
 
         # ルート変更なしで再申請
         data = {
-            "title": "修正しました", "content": "修正内容",
-            "approvers-TOTAL_FORMS": "1", "approvers-INITIAL_FORMS": "1",
+            "title": "修正しました",
+            "content": "修正内容",
+            "approvers-TOTAL_FORMS": "1",
+            "approvers-INITIAL_FORMS": "1",
             "approvers-MIN_NUM_FORMS": "0",
             "approvers-MAX_NUM_FORMS": "1000",
             "approvers-0-id": str(app_rec.id),
@@ -323,8 +338,7 @@ class ApprovalWorkflowTest(TestCase):
             app_rec.refresh_from_db()
 
         # 新しいレコードが作成され、ステータスがPendingになっていることを確認
-        new_approver = Approver.objects.get(
-            request=req, user=self.approver1)
+        new_approver = Approver.objects.get(request=req, user=self.approver1)
         self.assertEqual(new_approver.status, Approver.STATUS_PENDING)
         # IDが変わっていることも確認（再作成の証拠）
         self.assertNotEqual(new_approver.id, app_rec.id)
@@ -332,13 +346,12 @@ class ApprovalWorkflowTest(TestCase):
     def test_approve_already_withdrawn(self):
         """取り下げ済みの申請に対する承認試行のテスト"""
         req = SimpleRequest.objects.create(
-            title="入れ違いテスト", applicant=self.applicant,
+            title="入れ違いテスト",
+            applicant=self.applicant,
             status=Request.STATUS_WITHDRAWN,
-            request_number="REQ-CONFLICT1"
+            request_number="REQ-CONFLICT1",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         self.client.force_login(self.approver1)
         action_url = reverse("approvals:action", kwargs={"pk": req.id})
@@ -361,13 +374,12 @@ class ApprovalWorkflowTest(TestCase):
     def test_approve_already_approved(self):
         """既に承認済みの申請に対する承認試行のテスト"""
         req = SimpleRequest.objects.create(
-            title="二重承認テスト", applicant=self.applicant,
+            title="二重承認テスト",
+            applicant=self.applicant,
             status=Request.STATUS_APPROVED,
-            request_number="REQ-CONFLICT2"
+            request_number="REQ-CONFLICT2",
         )
-        Approver.objects.create(
-            request=req, user=self.approver1, order=1
-        )
+        Approver.objects.create(request=req, user=self.approver1, order=1)
 
         self.client.force_login(self.approver1)
         action_url = reverse("approvals:action", kwargs={"pk": req.id})
@@ -387,14 +399,17 @@ class ApprovalWorkflowTest(TestCase):
         """差戻し状態からの取り下げテスト"""
         # 差戻し状態の申請を作成
         req = SimpleRequest.objects.create(
-            title="差戻し取り下げテスト", applicant=self.applicant,
+            title="差戻し取り下げテスト",
+            applicant=self.applicant,
             status=Request.STATUS_REMANDED,
-            request_number="REQ-REM-WD"
+            request_number="REQ-REM-WD",
         )
         # 承認者（差戻しを実行したという想定）
         Approver.objects.create(
-            request=req, user=self.approver1, order=1,
-            status=Approver.STATUS_REMANDED
+            request=req,
+            user=self.approver1,
+            order=1,
+            status=Approver.STATUS_REMANDED,
         )
 
         # メールボックスをクリア（ここまでの通知などは無視）
@@ -421,13 +436,16 @@ class ApprovalWorkflowTest(TestCase):
     def test_reject_after_approval(self):
         """承認完了後の事後却下テスト"""
         req = SimpleRequest.objects.create(
-            title="事後却下", applicant=self.applicant,
+            title="事後却下",
+            applicant=self.applicant,
             status=Request.STATUS_APPROVED,  # 既に承認済み
-            request_number="REQ-POST-REJ"
+            request_number="REQ-POST-REJ",
         )
         Approver.objects.create(
-            request=req, user=self.approver1, order=1,
-            status=Approver.STATUS_APPROVED
+            request=req,
+            user=self.approver1,
+            order=1,
+            status=Approver.STATUS_APPROVED,
         )
 
         self.client.force_login(self.approver1)
@@ -444,20 +462,25 @@ class ApprovalWorkflowTest(TestCase):
     def test_approve_skip_order(self):
         """順番抜かし承認の防止テスト"""
         req = SimpleRequest.objects.create(
-            title="順序テスト", applicant=self.applicant,
+            title="順序テスト",
+            applicant=self.applicant,
             status=Request.STATUS_PENDING,
             request_number="REQ-ORDER",
-            current_step=1
+            current_step=1,
         )
         # 1番目: approver1 (未承認)
         Approver.objects.create(
-            request=req, user=self.approver1, order=1,
-            status=Approver.STATUS_PENDING
+            request=req,
+            user=self.approver1,
+            order=1,
+            status=Approver.STATUS_PENDING,
         )
         # 2番目: approver2 (未承認)
         Approver.objects.create(
-            request=req, user=self.approver2, order=2,
-            status=Approver.STATUS_PENDING
+            request=req,
+            user=self.approver2,
+            order=2,
+            status=Approver.STATUS_PENDING,
         )
 
         # 2番目の人(approver2)が無理やり承認を試みる
@@ -480,20 +503,25 @@ class ApprovalWorkflowTest(TestCase):
     def test_reject_skip_order(self):
         """順番抜かし却下の防止テスト"""
         req = SimpleRequest.objects.create(
-            title="順序テスト(却下)", applicant=self.applicant,
+            title="順序テスト(却下)",
+            applicant=self.applicant,
             status=Request.STATUS_PENDING,
             request_number="REQ-ORDER-REJ",
-            current_step=1
+            current_step=1,
         )
         # 1番目: approver1 (未承認)
         Approver.objects.create(
-            request=req, user=self.approver1, order=1,
-            status=Approver.STATUS_PENDING
+            request=req,
+            user=self.approver1,
+            order=1,
+            status=Approver.STATUS_PENDING,
         )
         # 2番目: approver2 (未承認)
         Approver.objects.create(
-            request=req, user=self.approver2, order=2,
-            status=Approver.STATUS_PENDING
+            request=req,
+            user=self.approver2,
+            order=2,
+            status=Approver.STATUS_PENDING,
         )
 
         # 2番目の人(approver2)が無理やり却下を試みる
@@ -502,8 +530,9 @@ class ApprovalWorkflowTest(TestCase):
 
         # 現状の実装だとこれが通ってしまう可能性がある
         response = self.client.post(
-            action_url, {"action": "reject", "comment": "フライング却下"},
-            follow=True
+            action_url,
+            {"action": "reject", "comment": "フライング却下"},
+            follow=True,
         )
 
         # エラーになるべき
