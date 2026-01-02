@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+from typing import Any, Iterator, Optional
+
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.db.models import OneToOneRel
 
 from core.models import BaseModel
 
@@ -49,16 +55,18 @@ class Request(BaseModel):
     )
 
     # クラスごとの設定（サブクラスでオーバーライド）
-    request_prefix = "REQ"
-    url_slug = None  # URLで使用する識別子（例: 'simple'）。未設定の場合はクラス名小文字になる
+    request_prefix: str = "REQ"
+    url_slug: Optional[str] = (
+        None  # URLで使用する識別子（例: 'simple'）。未設定の場合はクラス名小文字になる
+    )
 
     @classmethod
-    def get_request_types(cls):
+    def get_request_types(cls) -> list[type[Request]]:
         """
         利用可能な申請タイプ（Requestの具象サブクラス）のリストを返す。
         """
 
-        def get_all_subs(p):
+        def get_all_subs(p: type[Request]) -> Iterator[type[Request]]:
             for sub in p.__subclasses__():
                 # 孫クラスを再帰的に取得
                 yield from get_all_subs(sub)
@@ -72,7 +80,7 @@ class Request(BaseModel):
         # return [c for c in subclasses if not c._meta.abstract]
 
     @classmethod
-    def get_by_slug(cls, slug):
+    def get_by_slug(cls, slug: str) -> Optional[type[Request]]:
         """
         スラッグから対応するモデルクラスを返す。
         """
@@ -82,7 +90,7 @@ class Request(BaseModel):
         return None
 
     @classmethod
-    def get_slug(cls):
+    def get_slug(cls) -> str:
         """
         このモデルのURLスラッグを返す。
         """
@@ -95,29 +103,37 @@ class Request(BaseModel):
             return name[:-7]
         return name
 
-    def get_real_instance(self):
+    def get_real_instance(self) -> Request:
         """
         自身に関連付けられた子モデルのインスタンスを返す。
         子モデルが見つからない場合は自分自身(Request)を返す。
         """
         # 関連オブジェクト（逆参照）の中から、マルチテーブル継承のリンクを探す
-        for related_object in self._meta.related_objects:
-            if related_object.one_to_one and related_object.parent_link:
+        for field in self._meta.get_fields():
+            if isinstance(field, OneToOneRel) and field.parent_link:
+                # 型チェック: related_model が文字列や 'self' でないことを確認
+                if not isinstance(field.related_model, type) or not issubclass(
+                    field.related_model, models.Model
+                ):
+                    continue
+
                 try:
                     # 子モデルへのアクセサ
                     # （例: simplerequest）を使って取得を試みる
-                    return getattr(self, related_object.get_accessor_name())
-                except related_object.related_model.DoesNotExist:
+                    accessor_name = field.get_accessor_name()
+                    if accessor_name:
+                        return getattr(self, accessor_name)
+                except ObjectDoesNotExist:
                     continue
         return self
 
-    def get_extra_fields(self):
+    def get_extra_fields(self) -> list[dict[str, Any]]:
         """
         詳細表示用に、Requestモデル固有のフィールドを除いた
         フィールド情報のリストを返す。
         （デフォルトテンプレートで使用）
         """
-        data = []
+        data: list[dict[str, Any]] = []
         # 親モデル(Request)のフィールド名セット
         # 注意: selfがRequestインスタンスの場合もあるが、
         #       通常はサブクラスのインスタンスで呼ばれる
@@ -143,7 +159,7 @@ class Request(BaseModel):
         return data
 
     @property
-    def detail_template_name(self):
+    def detail_template_name(self) -> str:
         """
         詳細表示用のテンプレートパスを返す。
         デフォルトは 'approvals/partials/detail_{model_name}.html'。
@@ -151,7 +167,7 @@ class Request(BaseModel):
         return f"approvals/partials/detail_{self._meta.model_name}.html"
 
     @property
-    def form_class_name(self):
+    def form_class_name(self) -> str:
         """
         対応するフォームクラス名を返す。
         デフォルトは '{ModelName}Form'。
@@ -159,10 +175,10 @@ class Request(BaseModel):
         return f"{self._meta.object_name}Form"
 
     @property
-    def model_verbose_name(self):
-        return self._meta.verbose_name
+    def model_verbose_name(self) -> str:
+        return str(self._meta.verbose_name)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.request_number}: {self.title}"
 
 
@@ -204,7 +220,9 @@ class Approver(BaseModel):
     class Meta:
         ordering = ["order"]
 
-    def __str__(self):
+    def __str__(self) -> str:
+        # Userモデルのメソッドを使うが、ここは遅延インポート等は不要
+        # DjangoのForeignKeyは自動的に関連モデルのインスタンスを返すため
         display_name = self.user.get_display_name()
         return f"{self.request.request_number} - {self.order}: {display_name}"
 
@@ -252,5 +270,5 @@ class ApprovalLog(BaseModel):
     class Meta:
         ordering = ["created_at"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.request.request_number} - {self.get_action_display()}"

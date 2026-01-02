@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django import forms
 from django.contrib.auth import get_user_model
 
@@ -23,10 +25,16 @@ class SearchForm(forms.Form):
             }
         ),
     )
+
+    # mypy対策: 選択肢のキー(int)を文字列に変換して型を list[tuple[str, str]] に統一する
+    _status_choices = [("", "全て")] + [
+        (str(k), v) for k, v in Request.STATUS_CHOICES
+    ]
+
     status = forms.ChoiceField(
         label="ステータス",
         required=False,
-        choices=[("", "全て")] + Request.STATUS_CHOICES,
+        choices=_status_choices,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
     applicant = forms.ModelChoiceField(

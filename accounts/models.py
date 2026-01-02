@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import secrets
 from datetime import timedelta
+from typing import Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -13,13 +16,15 @@ from django.utils import timezone
 from core.models import BaseModel
 
 
-class UserManager(BaseUserManager):
+class UserManager(BaseUserManager["User"]):
     """
     カスタムユーザーマネージャー。
     メールアドレスを主識別子として使用する。
     """
 
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(
+        self, email: str, password: Optional[str] = None, **extra_fields: Any
+    ) -> User:
         if not email:
             raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
@@ -31,7 +36,9 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(
+        self, email: str, password: Optional[str] = None, **extra_fields: Any
+    ) -> User:
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
@@ -67,7 +74,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         default=timezone.now, verbose_name="登録日時"
     )
 
-    objects = UserManager()
+    objects: UserManager = UserManager()
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -102,7 +109,7 @@ class LoginToken(BaseModel):
     expires_at = models.DateTimeField()
 
     @classmethod
-    def create_token(cls, user):
+    def create_token(cls, user: User) -> LoginToken:
         """
         新しいトークンを生成して保存する。
         """

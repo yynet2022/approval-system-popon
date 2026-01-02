@@ -103,10 +103,9 @@ class ApproverAdmin(admin.ModelAdmin):
         "user__email",
     )
 
+    @admin.display(description="申請番号")
     def request_display(self, obj):
         return obj.request.request_number
-
-    request_display.short_description = "申請番号"
 
 
 @admin.register(ApprovalLog)
@@ -136,10 +135,9 @@ class ApprovalLogAdmin(admin.ModelAdmin):
         "updated_at",
     )
 
+    @admin.display(description="申請番号")
     def request_display(self, obj):
         return obj.request.request_number
-
-    request_display.short_description = "申請番号"
 
     def has_add_permission(self, request):
         return False

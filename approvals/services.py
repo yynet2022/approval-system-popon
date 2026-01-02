@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from django.conf import settings
 from django.core.mail import EmailMessage
@@ -6,6 +9,12 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 
 from .models import Approver
+
+if TYPE_CHECKING:
+    from django.http import HttpRequest
+
+    from accounts.models import User
+    from approvals.models import Request
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +25,13 @@ class NotificationService:
     """
 
     @staticmethod
-    def _send_email(to_user, subject, template_name, context, cc_users=None):
+    def _send_email(
+        to_user: Union[User, list[User], None],
+        subject: str,
+        template_name: str,
+        context: dict[str, Any],
+        cc_users: Optional[list[User]] = None,
+    ) -> None:
         """
         内部用: メール送信実行メソッド
         Args:
@@ -27,7 +42,7 @@ class NotificationService:
             cc_users: CC送付先ユーザーリスト (Userモデルインスタンスのリスト)
         """
         # 送信先リストの作成 (TO)
-        to_emails = []
+        to_emails: list[str] = []
         if isinstance(to_user, list):
             for u in to_user:
                 if u.email:
@@ -36,7 +51,7 @@ class NotificationService:
             to_emails.append(to_user.email)
 
         # 送信先リストの作成 (CC)
-        cc_emails = []
+        cc_emails: list[str] = []
         if cc_users:
             for u in cc_users:
                 if u.email and u.email not in to_emails:
@@ -66,7 +81,9 @@ class NotificationService:
             )
 
     @classmethod
-    def _get_detail_url(cls, request_obj, request=None):
+    def _get_detail_url(
+        cls, request_obj: Request, request: Optional[HttpRequest] = None
+    ) -> str:
         """
         申請詳細ページのURLを生成する
         """
@@ -78,7 +95,12 @@ class NotificationService:
         return f"http://localhost:8000{path}"
 
     @classmethod
-    def send_approval_request(cls, request_obj, next_approver, request=None):
+    def send_approval_request(
+        cls,
+        request_obj: Request,
+        next_approver: User,
+        request: Optional[HttpRequest] = None,
+    ) -> None:
         """
         承認依頼
         To: 次の承認者 (next_approver)
@@ -93,7 +115,12 @@ class NotificationService:
         )
 
     @classmethod
-    def send_resubmitted(cls, request_obj, first_approver, request=None):
+    def send_resubmitted(
+        cls,
+        request_obj: Request,
+        first_approver: User,
+        request: Optional[HttpRequest] = None,
+    ) -> None:
         """
         再申請通知
         To: 最初の承認者
@@ -108,7 +135,9 @@ class NotificationService:
         )
 
     @classmethod
-    def send_approved(cls, request_obj, request=None):
+    def send_approved(
+        cls, request_obj: Request, request: Optional[HttpRequest] = None
+    ) -> None:
         """
         承認完了通知
         To: 申請者
@@ -131,20 +160,26 @@ class NotificationService:
         )
 
     @classmethod
-    def send_remanded(cls, request_obj, actor, comment, request=None):
+    def send_remanded(
+        cls,
+        request_obj: Request,
+        actor: User,
+        comment: str,
+        request: Optional[HttpRequest] = None,
+    ) -> None:
         """
         差戻し通知
         To: 申請者
         Cc: 本承認者(実行者) + 承認済の過去の承認者
         """
-        cc_users = {actor}  # 実行者 (setで重複排除)
+        cc_users_set = {actor}  # 実行者 (setで重複排除)
 
         # 承認済みの承認者
         approved_approvers = request_obj.approvers.filter(
             status=Approver.STATUS_APPROVED
         )
         for approver in approved_approvers:
-            cc_users.add(approver.user)
+            cc_users_set.add(approver.user)
 
         subject = f"[{settings.PROJECT_NAME}] 差戻し: {request_obj.title}"
         context = {
@@ -159,24 +194,30 @@ class NotificationService:
             subject,
             "emails/remanded.txt",
             context,
-            cc_users=list(cc_users),
+            cc_users=list(cc_users_set),
         )
 
     @classmethod
-    def send_rejected(cls, request_obj, actor, comment, request=None):
+    def send_rejected(
+        cls,
+        request_obj: Request,
+        actor: User,
+        comment: str,
+        request: Optional[HttpRequest] = None,
+    ) -> None:
         """
         却下通知
         To: 申請者
         Cc: 実行者 + 承認済みの承認者
         """
-        cc_users = {actor}  # 実行者 (setで重複排除)
+        cc_users_set = {actor}  # 実行者 (setで重複排除)
 
         # 承認済みの承認者
         approved_approvers = request_obj.approvers.filter(
             status=Approver.STATUS_APPROVED
         )
         for approver in approved_approvers:
-            cc_users.add(approver.user)
+            cc_users_set.add(approver.user)
 
         subject = f"[{settings.PROJECT_NAME}] 却下: {request_obj.title}"
         context = {
@@ -191,11 +232,13 @@ class NotificationService:
             subject,
             "emails/rejected.txt",
             context,
-            cc_users=list(cc_users),
+            cc_users=list(cc_users_set),
         )
 
     @classmethod
-    def send_withdrawn(cls, request_obj, request=None):
+    def send_withdrawn(
+        cls, request_obj: Request, request: Optional[HttpRequest] = None
+    ) -> None:
         """
         取り下げ通知
         To: 現在の承認者(Pending)
@@ -240,7 +283,13 @@ class NotificationService:
                 )
 
     @classmethod
-    def send_proxy_remanded(cls, request_obj, actor, comment, request=None):
+    def send_proxy_remanded(
+        cls,
+        request_obj: Request,
+        actor: User,
+        comment: str,
+        request: Optional[HttpRequest] = None,
+    ) -> None:
         """
         代理差戻し通知
         To: 申請者

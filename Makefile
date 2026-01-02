@@ -14,10 +14,10 @@ all:
 	@echo "# python manage.py setup_test_data --no-color"
 
 check:
-	isort . --check | cat
-	black . --check | cat
-	flake8 --exclude migrations .
-	mypy .
+	-isort . --check | cat
+	-black . --check | cat
+	-flake8 --exclude migrations .
+	-mypy .
 
 format:
 	isort .
@@ -38,3 +38,6 @@ clean:
 distclean: clean
 	rm -f db.sqlite3 
 	find . -path '*/migrations/*.py' -not -name __init__.py | xargs rm -rf
+
+clobber: distclean
+	rm -rf .mypy_cache

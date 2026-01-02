@@ -13,8 +13,8 @@ authors = [
 ]
 license = {text = "MIT"}
 dependencies = [
-    "Django==4.2.27",
-    "django-autocomplete-light==3.12.1",
+    "Django>=4.2",
+    "django-autocomplete-light>=3.12.1",
     "tomli; python_version < '3.11'",
 ]
 

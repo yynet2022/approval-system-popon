@@ -325,6 +325,7 @@ class Command(BaseCommand):
                 Request.STATUS_APPROVED,
                 2,
                 [(leader, 1, "OK"), (kacho, 1, "承認")],
+                back_hours=10,
             )
 
     def make_simple(
@@ -337,6 +338,7 @@ class Command(BaseCommand):
         step,
         route,
         is_restricted=False,
+        back_hours=1,
     ):
         """SimpleRequest作成補助"""
         if Request.objects.filter(request_number=num).exists():
@@ -349,7 +351,7 @@ class Command(BaseCommand):
             status=status,
             current_step=step,
             is_restricted=is_restricted,
-            submitted_at=timezone.now() - timedelta(hours=1),
+            submitted_at=timezone.now() - timedelta(hours=back_hours),
         )
         self._set_route(req, applicant, route)
         self.stdout.write(f"簡易申請作成: {title} (No: {num})")
