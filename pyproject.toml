@@ -39,6 +39,7 @@ profile = "black"
 line_length = 79
 known_django = "django"
 sections = ["FUTURE", "STDLIB", "DJANGO", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+skip_glob = ["*/migrations/*.py"]
 color_output = false
 
 [tool.mypy]

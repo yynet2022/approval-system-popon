@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.db.models import Case, CharField, F, Q, Value, When
 from django.db.models.functions import Concat, Trim
@@ -116,7 +117,28 @@ class LoginView(View):
         form = LoginForm()
         return render(request, "accounts/login.html", {"form": form})
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
+        # Rate Limiting Logic
+        ip = request.META.get("REMOTE_ADDR")
+        cache_key = f"login_attempt_{ip}"
+        attempts = cache.get(cache_key, 0)
+
+        if attempts >= 5:
+            logger.warning(f"Rate limit exceeded for IP: {ip}")
+            messages.error(
+                request,
+                "ログイン試行回数が多すぎます。しばらく待ってから再試行してください。",
+            )
+            return render(
+                request,
+                "accounts/login.html",
+                {
+                    "form": LoginForm(),
+                },
+            )
+
+        cache.set(cache_key, attempts + 1, 60)  # Expires in 60 seconds
+
         form = LoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
