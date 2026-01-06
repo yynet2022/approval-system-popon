@@ -1,10 +1,12 @@
 # portal/tests.py
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from accounts.models import User
 from approvals.models import Approver, Request
 from approvals.models.types import SimpleRequest
+
+User = get_user_model()
 
 
 class PortalViewTest(TestCase):

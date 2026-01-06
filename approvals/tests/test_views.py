@@ -1,13 +1,15 @@
 import logging
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 
-from accounts.models import User
 from approvals.models import Approver, Request
 from approvals.models.types import LocalBusinessTripRequest, SimpleRequest
+
+User = get_user_model()
 
 
 class ApprovalWorkflowTest(TestCase):

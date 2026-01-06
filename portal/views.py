@@ -133,6 +133,8 @@ class DashboardView(TemplateView):
                     "name": cls._meta.verbose_name,
                 }
             )
+        # 名前順でソート
+        available_types.sort(key=lambda x: x["name"])
         context["available_request_types"] = available_types
 
         return context
