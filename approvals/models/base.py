@@ -103,6 +103,15 @@ class Request(BaseModel):
             return name[:-7]
         return name
 
+    @classmethod
+    def get_help_texts(cls) -> dict[str, str]:
+        """
+        フォーム生成時に使用するhelp_textの辞書を返す。
+        サブクラスでオーバーライドして使用する。
+        例: return {"title": "具体的な件名を入力してください"}
+        """
+        return {}
+
     def get_real_instance(self) -> Request:
         """
         自身に関連付けられた子モデルのインスタンスを返す。

@@ -1,4 +1,3 @@
-# approvals/tests.py
 import logging
 
 from django.conf import settings
@@ -7,9 +6,8 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import User
-
-from .models import Approver, Request
-from .models.types import LocalBusinessTripRequest, SimpleRequest
+from approvals.models import Approver, Request
+from approvals.models.types import LocalBusinessTripRequest, SimpleRequest
 
 
 class ApprovalWorkflowTest(TestCase):

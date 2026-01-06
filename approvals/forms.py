@@ -91,7 +91,10 @@ def create_request_form_class(model_class):
 
     # フォームクラス生成
     return modelform_factory(
-        model_class, exclude=exclude_fields, widgets=widgets
+        model_class,
+        exclude=exclude_fields,
+        widgets=widgets,
+        help_texts=model_class.get_help_texts(),
     )
 
 
