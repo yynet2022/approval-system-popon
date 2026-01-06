@@ -112,6 +112,20 @@ class Request(BaseModel):
         """
         return {}
 
+    @classmethod
+    def get_labels(cls) -> dict[str, str]:
+        """
+        フォーム生成時に使用するlabelsの辞書を返す。
+        """
+        return {}
+
+    @classmethod
+    def get_widgets(cls) -> dict[str, Any]:
+        """
+        フォーム生成時に使用するwidgetsの辞書を返す。
+        """
+        return {}
+
     def get_real_instance(self) -> Request:
         """
         自身に関連付けられた子モデルのインスタンスを返す。

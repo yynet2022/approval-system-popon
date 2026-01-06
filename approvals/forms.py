@@ -25,15 +25,17 @@ def create_request_form_class(model_class):
         "updated_at",
     ]
 
-    # デフォルトのウィジェット設定
-    widgets = {
-        "title": forms.TextInput(attrs={"class": "form-control"}),
-        "is_restricted": forms.CheckboxInput(
-            attrs={"class": "form-check-input"}
-        ),
-    }
+    # モデル側での指定を優先しつつ、デフォルトのウィジェット設定をマージ
+    widgets = model_class.get_widgets()
 
-    # モデルのフィールドを走査してウィジェットを決定
+    if "title" not in widgets:
+        widgets["title"] = forms.TextInput(attrs={"class": "form-control"})
+    if "is_restricted" not in widgets:
+        widgets["is_restricted"] = forms.CheckboxInput(
+            attrs={"class": "form-check-input"}
+        )
+
+    # モデルのフィールドを走査してウィジェットを決定 (通常フィールド)
     for field in model_class._meta.fields:
         if field.name in exclude_fields:
             continue
@@ -89,11 +91,20 @@ def create_request_form_class(model_class):
                 attrs={"class": "form-control"}
             )
 
+    # ManyToManyField の判定を追加
+    for field in model_class._meta.many_to_many:
+        if field.name in exclude_fields or field.name in widgets:
+            continue
+        widgets[field.name] = forms.SelectMultiple(
+            attrs={"class": "form-select"}
+        )
+
     # フォームクラス生成
     return modelform_factory(
         model_class,
         exclude=exclude_fields,
         widgets=widgets,
+        labels=model_class.get_labels(),
         help_texts=model_class.get_help_texts(),
     )
 

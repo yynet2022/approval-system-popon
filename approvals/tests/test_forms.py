@@ -40,3 +40,63 @@ class RequestFormTest(SimpleTestCase):
         self.assertNotEqual(
             simple_form.fields["title"].help_text, "カスタムヘルプテキスト"
         )
+
+    def test_custom_label_in_form(self):
+        """モデルごとのラベルカスタマイズのテスト"""
+
+        class CustomLabelRequest(SimpleRequest):
+            class Meta:
+                proxy = True
+                app_label = "approvals"
+
+            @classmethod
+            def get_labels(cls):
+                return {"title": "カスタムラベル"}
+
+        FormClass = create_request_form_class(CustomLabelRequest)
+        form = FormClass()
+        self.assertEqual(form.fields["title"].label, "カスタムラベル")
+
+    def test_custom_widget_in_form(self):
+        """モデルごとのウィジェットカスタマイズのテスト"""
+        from django import forms
+
+        class CustomWidgetRequest(SimpleRequest):
+            class Meta:
+                proxy = True
+                app_label = "approvals"
+
+            @classmethod
+            def get_widgets(cls):
+                # 通常は Select だが RadioSelect に上書き
+                return {"content": forms.RadioSelect()}
+
+        FormClass = create_request_form_class(CustomWidgetRequest)
+        form = FormClass()
+        self.assertIsInstance(form.fields["content"].widget, forms.RadioSelect)
+
+    def test_m2m_field_in_form(self):
+        """ManyToManyField が適切に処理されるかのテスト"""
+        from django import forms
+        from django.db import models
+
+        from approvals.models import Request
+
+        # M2Mを持つテスト用モデル
+        class M2MRequest(Request):
+            tags = models.ManyToManyField(
+                "auth.Group", blank=True, verbose_name="タグ"
+            )
+
+            class Meta:
+                app_label = "approvals"
+
+        FormClass = create_request_form_class(M2MRequest)
+        form = FormClass()
+
+        # ManyToManyField が SelectMultiple ウィジェット（form-selectクラス付き）になっているか確認
+        self.assertIn("tags", form.fields)
+        self.assertIsInstance(form.fields["tags"].widget, forms.SelectMultiple)
+        self.assertEqual(
+            form.fields["tags"].widget.attrs.get("class"), "form-select"
+        )
