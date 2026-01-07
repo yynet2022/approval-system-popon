@@ -172,6 +172,10 @@ class Request(BaseModel):
             if field.name == "id":
                 continue
 
+            # マルチテーブル継承のポインタフィールドをスキップ
+            if field.name == "request_ptr":
+                continue
+
             value = getattr(self, field.name)
 
             # 表示用の値を調整
