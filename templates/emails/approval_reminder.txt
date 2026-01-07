@@ -1,0 +1,11 @@
+{{ approver_name }} 様
+
+現在、以下の申請が承認待ちとなっており、最後の更新から24時間が経過しています。
+ご確認の上、承認処理をお願いいたします。
+
+--------------------------------------------------
+{% for item in request_list %}
+・[{{ item.request_obj.request_number }}] {{ item.request_obj.title }} (申請者: {{ item.request_obj.applicant.get_display_name }}) - {{ item.request_obj.submitted_at|date:"Y/m/d" }}申請
+  {{ item.url }}
+{% endfor %}
+--------------------------------------------------

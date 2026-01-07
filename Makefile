@@ -13,11 +13,17 @@ all:
 	@echo "# python manage.py createsuperuser --no-input --email ${EMAIL}"
 	@echo "# python manage.py setup_test_data --no-color"
 
-check:
+code_check:
 	-isort . --check | cat
 	-black . --check | cat
 	-flake8 --exclude migrations .
 	-mypy .
+
+compile_check:
+	python manage.py check
+	find . -path '*/management/commands/*.py' -not -name __init__.py -not -name 'test*' | xargs python -m py_compile 
+
+check: compile_check code_check
 
 format:
 	isort .
