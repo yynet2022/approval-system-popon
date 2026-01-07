@@ -205,6 +205,61 @@ class RequestCreateView(BaseRequestCreateView):
         return getattr(self.model_class, "request_prefix", "REQ")
 
 
+class RequestCopyView(RequestCreateView):
+    """
+    既存の申請をコピーして新規作成するビュー。
+    """
+
+    def dispatch(self, request, *args, **kwargs):
+        # コピー元の申請を取得
+        self.original_request = get_object_or_404(Request, pk=kwargs.get("pk"))
+        # 子モデルのインスタンスを取得（重要：これがないとSimpleRequest等の固有フィールドが取れない）
+        self.original_request = self.original_request.get_real_instance()
+
+        # スラッグを取得
+        slug = self.original_request.get_slug()
+
+        # RequestCreateView.dispatch は kwargs['request_type'] を期待しているので注入
+        kwargs["request_type"] = slug
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+
+        # 除外するフィールド
+        exclude_fields = [
+            "id",
+            "request_number",
+            "applicant",
+            "status",
+            "current_step",
+            "submitted_at",
+            "created_at",
+            "updated_at",
+        ]
+
+        # モデルの全フィールドを走査して初期値をセット
+        # self.model_class は dispatch でセットされている
+        for field in self.model_class._meta.fields:
+            if field.name in exclude_fields:
+                continue
+
+            val = getattr(self.original_request, field.name)
+            # ManyToManyなどはここでは扱わない（Requestモデルには現状ないため）
+            # 必要なら処理を追加するが、現状の仕様ではスカラー値のみでOK
+            initial[field.name] = val
+
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["page_title"] = (
+            f"{self.model_class._meta.verbose_name} 作成 (コピー)"
+        )
+        return context
+
+
 class RequestUpdateView(LoginRequiredMixin, UpdateView):
     """
     再申請ビュー。

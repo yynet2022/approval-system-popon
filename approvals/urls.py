@@ -13,6 +13,12 @@ urlpatterns = [
         views.RequestCreateView.as_view(),
         name="create",
     ),
+    # コピー作成
+    path(
+        "copy/<uuid:pk>/",
+        views.RequestCopyView.as_view(),
+        name="copy",
+    ),
     # 共通処理
     path("<uuid:pk>/", views.RequestDetailView.as_view(), name="detail"),
     path(
