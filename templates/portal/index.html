@@ -7,22 +7,20 @@
 <div class="py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>ポータル</h1>
-        {% if user.is_authenticated %}
-            <div class="dropdown">
-              <button class="btn btn-primary btn-lg dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                新規申請
-              </button>
-              <ul class="dropdown-menu">
-                {% for req_type in available_request_types %}
-                    <li>
-                        <a class="dropdown-item" href="{% url 'approvals:create' req_type.slug %}">
-                            {{ req_type.name }}
-                        </a>
-                    </li>
-                {% endfor %}
-              </ul>
-            </div>
-        {% endif %}
+        <div class="dropdown">
+          <button class="btn btn-primary btn-lg dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            新規申請
+          </button>
+          <ul class="dropdown-menu">
+            {% for req_type in available_request_types %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'approvals:create' req_type.slug %}">
+                        {{ req_type.name }}
+                    </a>
+                </li>
+            {% endfor %}
+          </ul>
+        </div>
     </div>
 
     <!-- お知らせエリア -->
