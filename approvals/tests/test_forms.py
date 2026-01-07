@@ -100,3 +100,46 @@ class RequestFormTest(SimpleTestCase):
         self.assertEqual(
             form.fields["tags"].widget.attrs.get("class"), "form-select"
         )
+
+    def test_customize_formfield(self):
+        """formfield_callback によるフィールドカスタマイズのテスト"""
+        from django import forms
+        from django.db import models
+
+        from approvals.models import Request
+
+        class JsonFieldRequest(Request):
+            # JSONField を定義
+            options = models.JSONField(default=list, blank=True)
+
+            class Meta:
+                app_label = "approvals"
+
+            @classmethod
+            def customize_formfield(cls, field, **kwargs):
+                if field.name == "options":
+                    # kwargs に widget が含まれている場合があるため除外する
+                    kwargs.pop("widget", None)
+                    return forms.MultipleChoiceField(
+                        choices=[("A", "Option A"), ("B", "Option B")],
+                        widget=forms.CheckboxSelectMultiple,
+                        **kwargs,
+                    )
+                return super().customize_formfield(field, **kwargs)
+
+        FormClass = create_request_form_class(JsonFieldRequest)
+        form = FormClass()
+
+        # options フィールドが MultipleChoiceField になっているか
+        self.assertIsInstance(
+            form.fields["options"], forms.MultipleChoiceField
+        )
+        # ウィジェットが CheckboxSelectMultiple になっているか
+        self.assertIsInstance(
+            form.fields["options"].widget, forms.CheckboxSelectMultiple
+        )
+        # 選択肢が正しいか
+        self.assertEqual(
+            form.fields["options"].choices,
+            [("A", "Option A"), ("B", "Option B")],
+        )

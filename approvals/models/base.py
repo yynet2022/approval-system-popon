@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Iterator, Optional
 
+from django import forms
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -125,6 +126,17 @@ class Request(BaseModel):
         フォーム生成時に使用するwidgetsの辞書を返す。
         """
         return {}
+
+    @classmethod
+    def customize_formfield(
+        cls, field: models.Field, **kwargs
+    ) -> Optional[forms.Field]:
+        """
+        modelform_factory の formfield_callback として使用するフック。
+        サブクラスでオーバーライドすることで、特定のフィールドのフォーム表現を変更できる。
+        例: JSONField を MultipleChoiceField に変更するなど。
+        """
+        return field.formfield(**kwargs)
 
     def get_real_instance(self) -> Request:
         """

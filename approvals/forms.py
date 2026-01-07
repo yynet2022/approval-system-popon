@@ -106,6 +106,7 @@ def create_request_form_class(model_class):
         widgets=widgets,
         labels=model_class.get_labels(),
         help_texts=model_class.get_help_texts(),
+        formfield_callback=model_class.customize_formfield,
     )
 
 

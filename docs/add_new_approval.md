@@ -98,3 +98,64 @@ python manage.py migrate
 ```
 
 このファイルを作成すると、詳細画面で優先的に使用されます。削除すればデフォルト表示に戻ります。
+
+### フォームフィールドの高度なカスタマイズ（複数選択など）
+
+デフォルトのフォーム生成ロジックでは対応できないフィールド（例: `JSONField` を使ったチェックボックス複数選択）を実装したい場合は、モデルクラスに `customize_formfield` クラスメソッドを定義します。
+
+**例: 備品購入申請 `EquipmentRequest` (付属品を複数選択)**
+
+```python
+from django import forms
+from django.db import models
+from .base import Request
+
+class EquipmentRequest(Request):
+    request_prefix = "REQ-E"
+    url_slug = "equipment"
+
+    equipment_name = models.CharField(max_length=100, verbose_name="品名")
+
+    # 選択肢の定義
+    OPTION_CHOICES = [
+        ("mouse", "マウス"),
+        ("keyboard", "キーボード"),
+        ("monitor", "モニター"),
+        ("cable", "各種ケーブル"),
+    ]
+
+    # データはJSONFieldとして保存する（default=list で空リストを初期値に）
+    options = models.JSONField(
+        verbose_name="付属品オプション",
+        default=list,
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = "備品購入申請"
+        verbose_name_plural = "備品購入申請"
+
+    @classmethod
+    def customize_formfield(cls, field, **kwargs):
+        """
+        フォームフィールドの生成をフックしてカスタマイズする
+        """
+        if field.name == "options":
+            # 重要: システム側で自動設定される 'widget' 引数が衝突しないように除去する
+            kwargs.pop("widget", None)
+            
+            # JSONField を MultipleChoiceField (CheckboxSelectMultiple) として扱う
+            return forms.MultipleChoiceField(
+                choices=cls.OPTION_CHOICES,
+                widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+                **kwargs
+            )
+        
+        # その他のフィールドは親クラスのデフォルト処理に任せる
+        return super().customize_formfield(field, **kwargs)
+```
+
+**ポイント:**
+1.  データストレージには `models.JSONField(default=list)` を使用します。
+2.  `customize_formfield` で `field.name` をチェックし、対象フィールドの場合のみフォームフィールドのインスタンスを返します。
+3.  **重要**: `kwargs.pop("widget", None)` を実行して、自動生成ロジックが渡してくるデフォルトのウィジェット設定を除去してください。これを行わないと「キーワード引数が重複している」というエラーが発生します。
